@@ -4,7 +4,7 @@ from pyspark.sql.functions import lit
 
 
 # spark入口
-def create_env() -> SparkSession:
+def create_env():
     spark = SparkSession.builder \
         .appName("HiveTest") \
         .master("local") \
