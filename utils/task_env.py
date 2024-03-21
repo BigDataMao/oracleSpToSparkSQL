@@ -8,7 +8,7 @@ def create_env():
     spark = SparkSession.builder \
         .appName("HiveTest") \
         .master("local") \
-        .config("spark.sql.warehouse.dir", "/user/hive/warehouse") \
+        .config("spark.sql.warehouse.dir", "hdfs://cdh-master:8020/user/hive/warehouse") \
         .config("spark.hadoop.hive.metastore.uris", "thrift://cdh_master:10000") \
         .config("spark.hadoop.hive.exec.scratchdir", "/user/hive/tmp") \
         .enableHiveSupport() \
