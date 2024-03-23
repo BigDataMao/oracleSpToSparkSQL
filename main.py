@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
-from utils.task_env import create_env, return_to_hive
+
+from utils.P_COCKPIT_00120_DATA import p_cockpit_00120_data
+from utils.task_env import create_env
+from utils.parse_arguments import parse_arguments
 
 if __name__ == '__main__':
     spark = create_env()
-    data = [("a001", 10000, "D1")]
-    df_result = spark.createDataFrame(data, ["id", "salary", "dept_no"])
-    return_to_hive(spark, df_result, "test.t_emp", "overwrite")
+    busi_date = parse_arguments()
+
+    print("busi_date: ", busi_date)
+
+    p_cockpit_00120_data(spark, busi_date)
