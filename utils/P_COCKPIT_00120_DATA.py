@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from utils.task_env import return_to_hive_partitioned, return_to_hive
-from pyspark.sql.functions import col, sum, expr
+from pyspark.sql.functions import col, sum, expr, round, when, lit
 
 
 def p_cockpit_00120_data(spark, busi_date):
@@ -32,27 +32,30 @@ def p_cockpit_00120_data(spark, busi_date):
     if v_interest_rate is None:
         v_interest_rate = '1'
 
-    # 从Hive表加载数据
-    df_a = spark.table("CTP63.T_DS_ADM_INVESTOR_VALUE")
-    df_b = spark.table("CTP63.T_DS_DC_INVESTOR")
+    # 读取数据表 CTP63.T_DS_ADM_INVESTOR_VALUE 和 CTP63.T_DS_DC_INVESTOR
+    df_a = spark.table("CTP63.T_DS_ADM_INVESTOR_VALUE").alias("a")
+    df_b = spark.table("CTP63.T_DS_DC_INVESTOR").alias("b")
 
-    # 执行SQL逻辑
-    df_T_COCKPIT_00120_JZGX = df_a.join(df_b, df_a.investor_id == df_b.investor_id) \
+    # 转换并计算字段
+    result_df = df_a.join(df_b, df_a.investor_id == df_b.investor_id) \
         .filter(df_a.date_dt == v_busi_date) \
-        .groupBy(df_a.investor_id) \
+        .groupBy(df_a["a.investor_id"]) \
         .agg(
-
-        round(sum(col("all_ri_amt")), 2).alias("SUM_RIGHTS"),
-        round(sum(col("subsistence_fee_amt")), 2).alias("remain_transfee"),
-        round(sum(col("calint_amt")), 2).alias("interest_base"),
-        round(sum(col("int_amt")), 2).alias("accrued_interest"),
-        round(sum(col("exchangeret_amt")), 2).alias("market_ret"),
-        round(sum(col("i_int_amt")), 2).alias("client_Interest_sett"),
-        round(sum(col("i_exchangeret_amt")), 2).alias("client_market_ret")
+        round(sum(when(v_trade_days > 0, col("a.all_ri_amt") / col("b.v_trade_days"))
+                  .otherwise(0)), 2).alias("avg_rights"),
+        round(sum(when(col("a.date_dt") == v_end_date, col("a.today_ri_amt"))
+                  .otherwise(0)), 2).alias("end_rights"),
+        round(sum(col("a.all_ri_amt")), 2).alias("SUM_RIGHTS"),
+        round(sum(col("a.subsistence_fee_amt")), 2).alias("remain_transfee"),
+        round(sum(col("a.calint_amt")), 2).alias("interest_base"),
+        round(sum(col("a.int_amt")), 2).alias("accrued_interest"),
+        round(sum(col("a.exchangeret_amt")), 2).alias("market_ret"),
+        round(sum(col("a.i_int_amt")), 2).alias("client_Interest_sett"),
+        round(sum(col("a.i_exchangeret_amt")), 2).alias("client_market_ret")
     )
     return_to_hive(
         spark,
-        df_T_COCKPIT_00120_JZGX,
+        result_df,
         "CF_BUSIMG.T_COCKPIT_00120_JZGX",
         "overwrite"
     )
@@ -61,7 +64,8 @@ def p_cockpit_00120_data(spark, busi_date):
     t_cockpit_00095 = spark.table("CF_BUSIMG.T_COCKPIT_00095")
 
     # 进行筛选操作，选择符合条件的数据
-    data_to_insert = t_cockpit_00095.filter((t_cockpit_00095.month_id == i_busi_month) & ~(t_cockpit_00095.product_name.like("%FOF%")))
+    data_to_insert = t_cockpit_00095.filter(
+        (t_cockpit_00095.month_id == i_busi_month) & ~(t_cockpit_00095.product_name.like("%FOF%")))
 
     # 选择需要的列，并重命名列名
     data_to_insert = data_to_insert.select(
@@ -98,8 +102,8 @@ def p_cockpit_00120_data(spark, busi_date):
         .withColumn("INTEREST_INCOME", expr("INTEREST_BASE * (1 + v_interest_rate) / 360")) \
         .withColumn("MARKET_REDUCT_EXTAX", expr("MARKET_REDUCT / (1 + v_tax_rate)")) \
         .withColumn("CLEAR_REMAIN_TRANSFEE_EXTAX", expr("CLEAR_REMAIN_TRANSFEE / (1 + v_tax_rate)")) \
-
-    # 根据条件筛选并更新
+ \
+        # 根据条件筛选并更新
     df_final = df_updated.filter(df_updated["busi_month"] == i_busi_month)
 
     # 加载表格test.t_cockpit_00120并进行更新操作
