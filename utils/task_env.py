@@ -41,6 +41,20 @@ def return_to_hive(spark, df_result, target_table, insert_mode):
         if c not in df_result.columns:
             df_result = df_result.withColumn(c, lit(None))
 
+    """
+    以下代码用于处理df_result中的列数量比Hive表中的列多的情况
+    """
+    # 获取Hive表的列名
+    hive_table_columns = spark \
+        .sql("DESCRIBE {}".format(target_table)) \
+        .select("col_name")\
+        .rdd \
+        .map(lambda r: r[0]) \
+        .collect()
+    # 选择与Hive表列名匹配的列
+    selected_columns = list(filter(lambda col: col in hive_table_columns, df_result.columns))
+    df_result = df_result.select(selected_columns)
+
     # 插入数据
     df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
 
