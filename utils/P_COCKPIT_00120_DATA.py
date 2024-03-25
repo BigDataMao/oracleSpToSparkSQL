@@ -8,7 +8,7 @@ from utils.task_env import return_to_hive, return_to_hive_partitioned
 def p_cockpit_00120_data(spark, busi_date):
     i_busi_month = busi_date[:6]
     # 查询符合条件的数据
-    date_df = spark.table("cf_sett.t_pub_date").filter(
+    date_df = spark.table("edw.t10_pub_date").filter(
         (col("busi_date").substr(1, 6) == i_busi_month) &
         (col("market_no") == "1") &
         (col("trade_flag") == "1")
@@ -19,8 +19,8 @@ def p_cockpit_00120_data(spark, busi_date):
     v_end_date = date_df.agg({"busi_date": "max"}).collect()[0][0]
     v_busi_date = i_busi_month[:4] + '-' + i_busi_month[4:6] + '-01'
 
-    data_tax_interest = spark.table("cf_busimg.T_COCKPIT_00118_1").filter(
-        (col("i_busi_month").between(col("begin_month"), col("end_month")))
+    data_tax_interest = spark.table("ddw.T_COCKPIT_00118_1").filter(
+        (lit(i_busi_month).between(col("begin_month"), col("end_month")))
     ).select("tax_rate", "interest_rate").collect()
 
     # 获取税率和利率
@@ -33,18 +33,18 @@ def p_cockpit_00120_data(spark, busi_date):
     if v_interest_rate is None:
         v_interest_rate = '1'
 
-    # 读取数据表 CTP63.T_DS_ADM_INVESTOR_VALUE 和 CTP63.T_DS_DC_INVESTOR
-    df_a = spark.table("CTP63.T_DS_ADM_INVESTOR_VALUE")
-    df_b = spark.table("CTP63.T_DS_DC_INVESTOR")
+    # 读取数据表 ods.ctp63_T_DS_ADM_INVESTOR_VALUE 和 ods.ctp63_T_DS_DC_INVESTOR
+    df_a = spark.table("ods.ctp63_T_DS_ADM_INVESTOR_VALUE")
+    df_b = spark.table("ods.ctp63_T_DS_DC_INVESTOR")
 
     # 转换并计算字段
     t_cockpit_00120_jzgx = df_a.join(df_b, df_a.investor_id == df_b.investor_id) \
         .filter(df_a.date_dt == v_busi_date) \
         .groupBy(df_a.investor_id) \
         .agg(
-        round(sum(when(v_trade_days > 0, df_a.all_ri_amt / v_trade_days)
+        round(sum(when(lit(v_trade_days) > 0, df_a.all_ri_amt / v_trade_days)
                   .otherwise(0)), 2).alias("avg_rights"),
-        round(sum(when(col(df_a.date_dt) == v_end_date, df_a.today_ri_amt)
+        round(sum(when(df_a.date_dt == lit(v_end_date), df_a.today_ri_amt)
                   .otherwise(0)), 2).alias("end_rights"),
         round(sum(df_a.all_ri_amt), 2).alias("SUM_RIGHTS"),
         round(sum(df_a.subsistence_fee_amt), 2).alias("remain_transfee"),
@@ -53,32 +53,32 @@ def p_cockpit_00120_data(spark, busi_date):
         round(sum(df_a.exchangeret_amt), 2).alias("market_ret"),
         round(sum(df_a.i_int_amt), 2).alias("client_Interest_sett"),
         round(sum(df_a.i_exchangeret_amt), 2).alias("client_market_ret")
-    )
+    ).withColumnRenamed("investor_id", "fund_account_id")
 
     return_to_hive(
         spark,
         t_cockpit_00120_jzgx,
-        "CF_BUSIMG.T_COCKPIT_00120_JZGX",
+        "ddw.T_COCKPIT_00120_JZGX",
         "overwrite"
     )
 
-    # 读取CF_BUSIMG.T_COCKPIT_00095表的数据
-    t_cockpit_00095 = spark.table("CF_BUSIMG.T_COCKPIT_00095")
+    # 读取ddw.T_COCKPIT_00095表的数据
+    t_cockpit_00095 = spark.table("ddw.T_COCKPIT_00095")
 
     # 初始化数据
     t_cockpit_00120 = t_cockpit_00095.filter(
         (col("month_id") == i_busi_month) &
         ~(col("product_name").like("%FOF%"))
-    ).withColumnRename("month_id", "busi_month")
+    ).withColumnRenamed("month_id", "busi_month")
 
     # 从Hive中读取数据
-    df_a = spark.table("CF_BUSIMG.T_COCKPIT_00120_JZGX")
-    df_b = spark.table("CF_BUSIMG.T_COCKPIT_00095_1")
+    df_a = t_cockpit_00120_jzgx
+    df_b = spark.table("ddw.T_COCKPIT_00095_1")
 
     # 执行JOIN和GROUP BY操作
     merged_df = df_a.join(df_b, df_a.fund_account_id == df_b.fund_account_id) \
         .filter(df_b.month_id == i_busi_month) \
-        .groupBy(i_busi_month, "filing_code") \
+        .groupBy(lit(i_busi_month).alias("busi_month"), "filing_code") \
         .agg(
         sum("end_rights").alias("end_rights"),
         sum("avg_rights").alias("avg_rights"),
@@ -93,11 +93,11 @@ def p_cockpit_00120_data(spark, busi_date):
     # 更新目标表
     target_df = merged_df \
         .join(t_cockpit_00120,
-              (merged_df.i_busi_month == i_busi_month) & (
+              (merged_df.busi_month == i_busi_month) & (
                       merged_df.filing_code == t_cockpit_00120.filing_code),
               "outer") \
         .select(
-            coalesce(merged_df.i_busi_month, t_cockpit_00120.i_busi_month).alias("busi_month"),
+            coalesce(merged_df.busi_month, t_cockpit_00120.busi_month).alias("busi_month"),
             coalesce(merged_df.filing_code, t_cockpit_00120.filing_code).alias("filing_code"),
             coalesce(merged_df.end_rights, lit(0)).alias("end_rights"),
             coalesce(merged_df.avg_rights, lit(0)).alias("avg_rights"),
@@ -130,7 +130,7 @@ def p_cockpit_00120_data(spark, busi_date):
     return_to_hive_partitioned(
         spark,
         df_final,
-        "CF_BUSIMG.T_COCKPIT_00120",
+        "ddw.T_COCKPIT_00120",
         "i_busi_month",
         i_busi_month,
         "overwrite"
