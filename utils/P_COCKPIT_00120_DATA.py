@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import logging
 
 from pyspark.sql.functions import col, sum, expr, round, when, coalesce, lit
 
@@ -135,3 +136,5 @@ def p_cockpit_00120_data(spark, busi_date):
         i_busi_month,
         "overwrite"
     )
+
+    logging.info("ddw.T_COCKPIT_00120写入完成")
