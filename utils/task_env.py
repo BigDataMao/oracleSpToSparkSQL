@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit
+from pyspark.sql.functions import lit, col
 
 
 # spark入口
@@ -18,20 +18,13 @@ def create_env():
     return spark
 
 
-def is_overwrite(insert_mode):
-    if insert_mode == "overwrite":
-        return True
-    else:
-        return False
-
-
-def return_to_hive(spark, df_result, target_table, insert_mode):
+def return_to_hive(spark, df_result, target_table, insert_mode, partition_column=None, partition_value=None):
     """
-    用于将数据返回hive
+    用于将数据返回hive或hive分区表
     :return: none
     """
-
-    if_overwrite = is_overwrite(insert_mode)
+    # 判断是否覆盖写
+    if_overwrite = insert_mode == "overwrite"
 
     # 获取目标表的元数据信息
     target_columns = [c.name for c in spark.table(target_table).schema]
@@ -41,13 +34,17 @@ def return_to_hive(spark, df_result, target_table, insert_mode):
         if c not in df_result.columns:
             df_result = df_result.withColumn(c, lit(None))
 
+    # 如果是分区表，添加分区列和值
+    if partition_column is not None and partition_value is not None:
+        df_result = df_result.withColumn(partition_column, lit(partition_value))
+
     """
     以下代码用于处理df_result中的列数量比Hive表中的列多的情况
     """
     # 获取Hive表的列名
     hive_table_columns = spark \
         .sql("DESCRIBE {}".format(target_table)) \
-        .select("col_name")\
+        .select("col_name") \
         .rdd \
         .map(lambda r: r[0]) \
         .collect()
@@ -59,24 +56,19 @@ def return_to_hive(spark, df_result, target_table, insert_mode):
     df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
 
 
-def return_to_hive_partitioned(spark, df_result, target_table, partition_column, partition_value, insert_mode):
-    """
-    用于将数据返回hive分区表
-    :return: none
-    """
+def drop_duplicate_columns(df):
+    columns = df.columns
+    cols_seen = set()
+    cols_to_drop = []
 
-    if_overwrite = is_overwrite(insert_mode)
+    for col in columns:
+        if col not in cols_seen:
+            cols_seen.add(col)
+        else:
+            cols_to_drop.append(col)
 
-    # 获取目标表的元数据信息
-    target_columns = [c.name for c in spark.table(target_table).schema]
+    cols_to_drop = cols_to_drop[1:]  # 保留重复列中的第一个
 
-    # 添加缺失的列并设置默认值
-    for c in target_columns:
-        if c not in df_result.columns:
-            df_result = df_result.withColumn(c, lit(None))
+    df = df.drop(*cols_to_drop)
 
-    # 添加分区列和值
-    df_result = df_result.withColumn(partition_column, lit(partition_value))
-
-    # 插入数据
-    df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
+    return df

@@ -3,6 +3,8 @@ import logging
 
 from utils.task_env import return_to_hive
 
+logging.basicConfig(level=logging.INFO)
+
 
 def p_cockpit_00121_data(spark, busi_date):
     i_busi_month = busi_date[:6]

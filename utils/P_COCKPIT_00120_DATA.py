@@ -3,7 +3,9 @@ import logging
 
 from pyspark.sql.functions import col, sum, expr, round, when, coalesce, lit
 
-from utils.task_env import return_to_hive, return_to_hive_partitioned
+from utils.task_env import return_to_hive
+
+logging.basicConfig(level=logging.INFO)
 
 
 def p_cockpit_00120_data(spark, busi_date):
@@ -128,13 +130,13 @@ def p_cockpit_00120_data(spark, busi_date):
                                    col("client_ret_interest")
                                    )
 
-    return_to_hive_partitioned(
+    return_to_hive(
         spark,
         df_final,
         "ddw.T_COCKPIT_00120",
-        "i_busi_month",
-        i_busi_month,
-        "overwrite"
+        "overwrite",
+        partition_column="busi_month",
+        partition_value=i_busi_month
     )
 
     logging.info("ddw.T_COCKPIT_00120写入完成")
