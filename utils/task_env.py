@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, col
+from pyspark.sql.functions import lit, col, coalesce
 
 
 # spark入口
@@ -49,26 +49,22 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
         .map(lambda r: r[0]) \
         .collect()
     # 选择与Hive表列名匹配的列
-    selected_columns = list(filter(lambda col: col in hive_table_columns, df_result.columns))
+    selected_columns = list(filter(lambda column: column in hive_table_columns, df_result.columns))
     df_result = df_result.select(selected_columns)
 
     # 插入数据
     df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
 
 
-def drop_duplicate_columns(df):
-    columns = df.columns
-    cols_seen = set()
-    cols_to_drop = []
+def update_dataframe(df1, df2, join_condition, update_columns: list):
 
-    for col in columns:
-        if col not in cols_seen:
-            cols_seen.add(col)
-        else:
-            cols_to_drop.append(col)
+    df_result = df1.join(df2, join_condition, "left")
 
-    cols_to_drop = cols_to_drop[1:]  # 保留重复列中的第一个
+    # Iterate over update_columns and apply the updates
+    for column in update_columns:
+        new_col_name = column + "_new"
+        df_result = df_result.withColumn(new_col_name, coalesce(df2[column], df1[column]))
+        df_result = df_result.drop(column)
+        df_result = df_result.withColumnRenamed(new_col_name, column)
 
-    df = df.drop(*cols_to_drop)
-
-    return df
+    return df_result

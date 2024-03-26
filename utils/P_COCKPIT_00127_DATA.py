@@ -44,7 +44,7 @@ def p_cockpit_00127_data(spark, busi_date):
         partition_value=i_month_id
     )
 
-    t_cockpit_00127 = spark.table("ddw.T_COCKPIT_00127")
+    t_cockpit_00127 = spark.table("ddw.T_COCKPIT_00127").alias("t")
 
     # 从Hive表中获取数据并聚合
     """
@@ -68,7 +68,8 @@ def p_cockpit_00127_data(spark, busi_date):
             sum(when(col("index_id") == lit('6061'), col("index_value")).otherwise(0)).alias("b10"),
             sum(when(col("index_id") == lit('6051'), col("index_value")).otherwise(0)).alias("b11")
         ) \
-        .withColumnRenamed("busi_month", "month_id")
+        .withColumnRenamed("busi_month", "month_id") \
+        .alias("y")
 
     t_cockpit_00127 = t_cockpit_00127.join(df_y, (df_y["book_id"] == t_cockpit_00127["book_id"]) &
                                            (df_y["month_id"] == t_cockpit_00127["month_id"]), "left") \
@@ -80,7 +81,6 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumn("b11", coalesce(df_y["b11"], t_cockpit_00127["b11"]))
 
     logging.info("第一阶段数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     """
     二、营业支出
@@ -113,7 +113,6 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumn("b17", coalesce(df_y["b17"], t_cockpit_00127["b17"]))
 
     logging.info("第二阶段数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     """
     三、营业利润
@@ -136,7 +135,6 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumn("b20", coalesce(df_y["b20"], t_cockpit_00127["b20"]))
 
     logging.info("第三阶段数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     """
     四、利润总额
@@ -157,7 +155,6 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumn("b22", coalesce(df_y["b22"], t_cockpit_00127["b22"]))
 
     logging.info("第四阶段数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     """
     本月数据最后一步
@@ -169,14 +166,18 @@ def p_cockpit_00127_data(spark, busi_date):
     """
 
     t_cockpit_00127 = t_cockpit_00127 \
-        .withColumn("b5", t_cockpit_00127["b6"] + t_cockpit_00127["b7"] + t_cockpit_00127["b8"] + t_cockpit_00127["b9"] + t_cockpit_00127["b10"] + t_cockpit_00127["b11"]) \
-        .withColumn("b12", t_cockpit_00127["b13"] + t_cockpit_00127["b14"] + t_cockpit_00127["b15"] + t_cockpit_00127["b16"] + t_cockpit_00127["b17"]) \
+        .withColumn("b5", t_cockpit_00127["b6"] + t_cockpit_00127["b7"]
+                    + t_cockpit_00127["b8"] + t_cockpit_00127["b9"]
+                    + t_cockpit_00127["b10"] + t_cockpit_00127["b11"]) \
+        .withColumn("b12", t_cockpit_00127["b13"] + t_cockpit_00127["b14"]
+                    + t_cockpit_00127["b15"] + t_cockpit_00127["b16"]
+                    + t_cockpit_00127["b17"]) \
         .withColumn("b18", t_cockpit_00127["b5"] - t_cockpit_00127["b12"]) \
-        .withColumn("b21", t_cockpit_00127["b18"] + t_cockpit_00127["b19"] - t_cockpit_00127["b20"]) \
+        .withColumn("b21", t_cockpit_00127["b18"] + t_cockpit_00127["b19"]
+                    - t_cockpit_00127["b20"]) \
         .withColumn("b23", t_cockpit_00127["b21"] - t_cockpit_00127["b22"])
 
     logging.info("最后一步数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     # ----------------------------------考核调出金额 begin--------------------------------------
 
@@ -243,7 +244,6 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumn("c22", coalesce(df_y["c22"], t_cockpit_00127["c22"]))
 
     logging.info("考核调出金额数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     # ----------------------------------考核调出金额 end----------------------------------------
 
@@ -311,7 +311,6 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumn("d22", coalesce(df_y["d22"], t_cockpit_00127["d22"]))
 
     logging.info("考核调入金额数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     # ----------------------------------考核调入金额 end----------------------------------------
 
@@ -361,7 +360,6 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumn("f23", col("b23") + col("e23"))
 
     logging.info("实际金额数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     # ----------------------------------本年金额 begin--------------------------------------
 
@@ -425,7 +423,6 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumn("g23", coalesce(df_y["g23"], t_cockpit_00127["g23"])) \
 
     logging.info("本年金额数据处理完成")
-    t_cockpit_00127 = drop_duplicate_columns(t_cockpit_00127)
 
     # ----------------------------------本年金额 end--------------------------------------
 
@@ -439,5 +436,3 @@ def p_cockpit_00127_data(spark, busi_date):
                    )
 
     logging.info("p_cockpit_00127_data.py执行完成")
-
-
