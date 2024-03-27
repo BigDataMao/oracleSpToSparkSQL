@@ -12,15 +12,15 @@ spark = SparkSession.builder \
     .master("local") \
     .getOrCreate()
 
-data1 = [("Alice", "34", 0)]
+data1 = [("Alice", "34", 0), ("Bob", "34", 0)]
 columns1 = ["name", "age", "salary"]
-df1 = spark.createDataFrame(data1, columns1).alias("a")
+df1 = spark.createDataFrame(data1, columns1)
 
-data2 = [("Alice", "Sales", "20000")]
-columns2 = ["name", "department", "salary"]
-df2 = spark.createDataFrame(data2, columns2).alias("b")
+data2 = [("Alice", "Sales", "20000", "a")]
+columns2 = ["name", "department", "salary", "cola"]
+df2 = spark.createDataFrame(data2, columns2)
 
-df_result = update_dataframe(df1, df2, df1["name"] == df2["name"], ["salary"])
+df_result = update_dataframe(df1, df2, ["name"], ["salary"])
 
 print(df_result.columns)
 df_result.show()
