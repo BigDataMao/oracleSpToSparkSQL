@@ -20,13 +20,9 @@ data2 = [("Alice", "Sales", "20000", "a")]
 columns2 = ["name", "department", "salary", "cola"]
 df2 = spark.createDataFrame(data2, columns2)
 
-df_result = update_dataframe(df1, df2, ["name"], ["salary"])
 
-print(df_result.columns)
-df_result.show()
-# df_result.select("a.salary").show(10, False)
+def test(a: int, b: int):
+    return (a + b) / 2
 
 
-
-
-
+print(test(1, 2))
