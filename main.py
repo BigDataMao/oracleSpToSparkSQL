@@ -15,13 +15,13 @@ if __name__ == '__main__':
     spark = create_env()
     busi_date = parse_arguments()
 
-    logging.info("接收到参数busi_date: ", busi_date)
+    logging.info("接收到参数busi_date: %s", busi_date)
 
-    p_cockpit_00120_data(spark, busi_date)
-
-    p_cockpit_00121_data(spark, busi_date)
-
-    p_cockpit_00127_data(spark, busi_date)
+    # p_cockpit_00120_data(spark, busi_date)
+    #
+    # p_cockpit_00121_data(spark, busi_date)
+    #
+    # p_cockpit_00127_data(spark, busi_date)
 
     p_cockpit_00128_data(spark, busi_date)
 
