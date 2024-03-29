@@ -14,15 +14,15 @@ spark = SparkSession.builder \
 
 data1 = [("Alice", "34", 0), ("Bob", "34", 0)]
 columns1 = ["name", "age", "salary"]
-df1 = spark.createDataFrame(data1, columns1)
+df1 = spark.createDataFrame(data1, columns1).alias("a")
 
-data2 = [("Alice", "Sales", "20000", "a")]
-columns2 = ["name", "department", "salary", "cola"]
-df2 = spark.createDataFrame(data2, columns2)
+data2 = [("Alice", "34", 0), ("Bob", "34", 0)]
+columns2 = ["name", "age", "salary"]
+df2 = spark.createDataFrame(data2, columns2).alias("b")
 
+df_3 = df1.join(df2, col("a.name") == col("b.name")) \
 
-def test(a: int, b: int):
-    return (a + b) / 2
+df_3 = df_3.withColumn("salary_1", col("a.age")) \
 
+df_3.show()
 
-print(test(1, 2))

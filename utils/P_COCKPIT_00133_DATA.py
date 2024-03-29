@@ -4,7 +4,7 @@
 """
 import logging
 
-from pyspark.sql.functions import col, lit, min, max, count, sum, coalesce
+from pyspark.sql.functions import col, lit, min, max, count, sum, coalesce, when
 
 from utils.task_env import return_to_hive, update_dataframe
 
@@ -79,15 +79,17 @@ def p_cockpit_00133_data(spark, busi_date):
     经纪业务收入-利息净收入 CLEAR_INTEREST_INCOME
     """
 
-    df_127 = spark.table("ddw.t_cockpit_00127")
-    df_b = spark.table("ddw.T_YY_BRANCH_OA_RELA")
+    df_127 = spark.table("ddw.t_cockpit_00127").alais("df_127")
+    df_b = spark.table("ddw.T_YY_BRANCH_OA_RELA").alais("df_b")
 
-    df_y = df_127.join(df_b, df_127["book_id"] == df_b["yy_book_id"]) \
+    df_y = df_127.join(df_b, col("df_127.book_id") == col("df_b.yy_book_id")) \
         .filter(col("month_id") == i_month_id) \
-        .groupby("oa_branch_id", "oa_branch_name") \
-        .agg(sum("b6").alias("REMAIN_TRANSFEE_INCOME"),
-             sum("b8").alias("MARKET_REDUCE_INCOME"),
-             sum("b7").alias("CLEAR_INTEREST_INCOME"))
+        .groupby(col("df_b.oa_branch_id"), col("df_b.oa_branch_name")) \
+        .agg(
+        sum("b6").alias("REMAIN_TRANSFEE_INCOME"),
+        sum("b8").alias("MARKET_REDUCE_INCOME"),
+        sum("b7").alias("CLEAR_INTEREST_INCOME")
+    ).alais("df_y")
 
     df_113_m = update_dataframe(
         df_to_update=df_113_m,
@@ -116,4 +118,199 @@ def p_cockpit_00133_data(spark, busi_date):
     交易咨询-销售收入  SALES_INCOME (投资咨询内核表——销售部门收入，业务单位作为销售部门时的收入)
     """
 
+    df_122 = spark.table("ddw.t_cockpit_00122") \
+        .filter(col("busi_month") == i_month_id).alias("t")
+    df_122_1 = spark.table("ddw.t_cockpit_00122_1") \
+        .filter(col("busi_month") == i_month_id).alias("a")
+    df_fund_account = spark.table("edw.h12_fund_account").alias("b")
+    df_branch_oa = spark.table("ddw.t_ctp_branch_oa_rela").alias("c")
+
+    df_y = df_122.join(
+        other=df_122_1,
+        on=["client_id", "product_name"],
+        how="left"
+    ).join(
+        other=df_fund_account,
+        on=col("t.client_id") == col("b.fund_account_id"),
+        how="left"
+    ).join(
+        other=df_branch_oa,
+        on=col("b.branch_id") == col("c.CTP_BRANCH_ID"),
+        how="inner"
+    ).groupby(
+        "c.oa_branch_id", "c.oa_branch_name"
+    ).agg(
+        sum(col("t.INVEST_TOTAL_SERVICE_FEE")).alias("TRANS_CONSULT_INCOME"),
+        sum(
+            when(
+                condition=col("a.ALLOCA_OA_BRANCH_TYPE") == lit("1"),
+                value=col("t.INVEST_TOTAL_SERVICE_FEE") * col("t.kernel_total_rate") * col("a.alloca_kernel_rate")
+            ).otherwise(lit(0))
+        ).alias("SALES_INCOME")
+    )
+
+    df_113_m = update_dataframe(
+        df_to_update=df_113_m,
+        df_use_me=df_y,
+        join_columns=["oa_branch_id"],
+        update_columns=["TRANS_CONSULT_INCOME", "SALES_INCOME"]
+    )
+
+    """更新
+    产品销售收入 PRODUCT_SALES_INCOME 未开发 默认未0
+    """
+
+    """更新
+    CF_BUSIMG.T_COCKPIT_00126   场外协同清算台账参数表
+    场外期权收入  OUT_OPTION_INCOME（ 场外期权-场外协同清算台账-合计收入 TOTAL_INCOME）
+    名义本金  NOTIONAL_PRINCIPAL
+    场外期权规模-权利金  ROYALTY
+    """
+
+    df_126 = spark.table("ddw.t_cockpit_00126").alias("t")
+
+    df_y = df_126.join(
+        other=df_fund_account,
+        on=col("t.client_id") == col("b.fund_account_id"),
+        how="left"
+    ).join(
+        other=df_branch_oa,
+        on=col("b.branch_id") == col("c.CTP_BRANCH_ID"),
+        how="inner"
+    ).groupby(
+        "c.oa_branch_id", "c.oa_branch_name"
+    ).agg(
+        sum(col("t.TOTAL_INCOME")).alias("OUT_OPTION_INCOME"),
+        sum(col("t.NOTIONAL_PRINCIPAL")).alias("NOTIONAL_PRINCIPAL"),
+        sum(col("t.TOTAL_ABSOLUTE_ROYALTY")).alias("ROYALTY")
+    )
+
+    df_113_m = update_dataframe(
+        df_to_update=df_113_m,
+        df_use_me=df_y,
+        join_columns=["oa_branch_id"],
+        update_columns=["OUT_OPTION_INCOME", "NOTIONAL_PRINCIPAL", "ROYALTY"]
+    )
+
+    """更新
+    未开发 默认未0
+    IB协同/驻点业务协同收入
+    自有资金项目参与收入
+    日均权益
+    考核日均权益
+    """
+
+    """更新
+    经纪业务规模-期末权益
+    期末权益 END_RIGHTS
+    """
+
+    df_sett = spark.table("edw.h15_client_sett") \
+        .alias("df_sett") \
+        .filter(col("df_sett.busi_date") == v_end_trade_date)
+
+    df_y = df_sett.join(
+        other=df_fund_account,
+        on=col("df_sett.client_id") == col("b.fund_account_id"),
+        how="left"
+    ).join(
+        other=df_branch_oa,
+        on=col("b.branch_id") == col("c.CTP_BRANCH_ID"),
+        how="inner"
+    ).groupby(
+        "c.oa_branch_id", "c.oa_branch_name"
+    ).agg(
+        sum(col("df_sett.rights")).alias("END_RIGHTS")
+    ).select(
+        "c.oa_branch_id", "c.oa_branch_name", "END_RIGHTS"
+    )
+
+    update_dataframe(
+        df_to_update=df_113_m,
+        df_use_me=df_y,
+        join_columns=["oa_branch_id"],
+        update_columns=["END_RIGHTS"]
+    )
+
+    """
+    产品销售规模 保有量 PRODUCT_INVENTORY
+    产品销售规模 新增量 PRODUCT_NEW 
+    """
+
+    df_96 = spark.table("ddw.t_cockpit_00096") \
+        .filter(col("busi_date").between(v_begin_trade_date, v_end_trade_date)) \
+        .alias("df_96")
+
+    df_y = df_96.join(
+        other=df_fund_account,
+        on=(
+            (col("df_96.id_no") == col("b.id_no")) &
+            (col("df_96.client_name") == col("b.client_name"))
+        ),
+        how="inner"
+    ).join(
+        other=df_branch_oa,
+        on=col("b.branch_id") == col("c.CTP_BRANCH_ID"),
+        how="inner"
+    ).groupby(
+        "c.oa_branch_id", "c.oa_branch_name"
+    ).agg(
+        sum(col("df_96.confirm_share")).alias("PRODUCT_INVENTORY"),
+        sum(
+            when(
+                col("a.wh_trade_type").isin(["0", "1"]),
+                col("a.confirm_share")
+            ).otherwise(0)
+        ).alias("PRODUCT_NEW")
+    ).select(
+        "c.oa_branch_id", "c.oa_branch_name", "PRODUCT_INVENTORY", "PRODUCT_NEW"
+    )
+
+    update_dataframe(
+        df_to_update=df_113_m,
+        df_use_me=df_y,
+        join_columns=["oa_branch_id"],
+        update_columns=["PRODUCT_INVENTORY", "PRODUCT_NEW"]
+    )
+
+    """
+    IB协同/驻点业务规模-期末权益 IB_END_RIGHTS  “IB协同统计汇总表——期末权益”与“驻点人员营销统计数据表——期末权益”之和
+    IB协同/驻点业务规模-日均权益 IB_AVG_RIGHTS  “IB协同统计汇总表——日均权益”与“驻点人员营销统计数据表——日均权益”之和
+    """
+
+    # IB协同统计汇总表——期末权益”
+
+    df_tmp = spark.table("ddw.t_cockpit_00107").alias("t") \
+        .join(
+            df_branch_oa.alias("c"),
+            col("t.branch_id") == col("c.CTP_BRANCH_ID"),
+            "inner"
+        ).filter(
+            (col("t.confirm_date").between(v_begin_trade_date, v_end_trade_date))
+        ).groupby(
+            "t.confirm_date", "t.fund_account_id", "c.OA_BRANCH_ID"
+        ).select(
+            col("t.confirm_date").alias("busi_date"), "t.fund_account_id", "c.OA_BRANCH_ID"
+        )
+
+    df_result = spark.table("cf_sett.t_client_sett").alias("t") \
+        .join(df_tmp.alias("a"),
+              (col("t.busi_date") == col("a.confirm_date")) & (col("t.fund_account_id") == col("a.fund_account_id")),
+              "inner") \
+        .filter((col("t.busi_date").between(v_begin_trade_date, v_end_trade_date))) \
+        .groupby("a.OA_BRANCH_ID") \
+        .agg(
+        sum(col("a.end_rights")).alias("end_rights"),
+        sum(when(col("v_trade_days") > 0, col("a.end_rights") / v_trade_days).otherwise(0)).alias("avg_rights")
+    )
+
+    # 将结果插入到目标表中
+    return_to_hive(
+        spark=spark,
+        df_result=df_result,
+        target_table="cf_busimg.tmp_cockpit_00133_1",
+        insert_mode="overwrite",
+        partition_column=None,  # 没有分区
+        partition_value=None
+    )
 
