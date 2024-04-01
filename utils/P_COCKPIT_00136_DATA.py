@@ -54,7 +54,7 @@ def p_cockpit_00136_data(spark, busi_date):
         spark=spark,
         df_result=df_136_y,
         target_table="ddw.T_COCKPIT_00136",
-        insert_mode="overwrite",
+        insert_mode="append",
     )
 
     logging.info("ddw.T_COCKPIT_00136[增量数据],写入完成")
