@@ -85,3 +85,5 @@ def p_cockpit_00136_data(spark, busi_date):
         target_table="ddw.T_COCKPIT_00136",
         insert_mode="overwrite",
     )
+
+    logging.info("ddw.T_COCKPIT_00136[全量数据],更新完成")
