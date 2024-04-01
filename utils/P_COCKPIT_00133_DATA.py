@@ -517,7 +517,7 @@ def p_cockpit_00133_data(spark, busi_date):
         (col("t.avg_rights") + coalesce(col("b.avg_rights"), lit(0))).alias("IB_AVG_RIGHTS"),
     )
 
-    update_dataframe(
+    df_113_m = update_dataframe(
         df_to_update=df_113_m,
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
