@@ -3,26 +3,35 @@
 """
 专门处理日期参数的工具类
 """
+from pyspark.sql.functions import col, min, max, count, lit
+
+pub_date_table = "edw.t10_pub_date"
 
 
 def get_last_year_begin_month(busi_date):
-    """
-    获取上一年的开始月份
-    :param busi_date: 业务日期,可以是任意日期,但必须是纯数字的字符串
-    """
-
-    year = busi_date[:4]
-    last_year = str(int(year) - 1)
-    return last_year + "01"
+    return str(int(busi_date[:4]) - 1) + "01"
 
 
 def get_last_year_end_month(busi_date):
-    """
-    获取上一年的结束月份
-    """
-
-    year = busi_date[:4]
-    last_year = str(int(year) - 1)
-    return last_year + "12"
+    return str(int(busi_date[:4]) - 1) + "12"
 
 
+def get_date_period_and_days_this_month(spark, busi_month, trade_flag="1"):
+    df_date = spark.table(pub_date_table) \
+        .filter(
+        (col("busi_date").substr(1, 6) == busi_month) &
+        (col("market_no") == "1") &
+        ((col("trade_flag") == "1") if trade_flag == "1" else lit(True))
+    ).agg(
+        min("busi_date").alias("v_begin_date"),
+        max("busi_date").alias("v_end_date"),
+        count("*").alias("v_trade_days")
+    )
+
+    if trade_flag == "1":
+        return (df_date.first()["v_begin_date"],
+                df_date.first()["v_end_date"],
+                df_date.first()["v_trade_days"])
+    else:
+        return (df_date.first()["v_begin_date"],
+                df_date.first()["v_end_date"])
