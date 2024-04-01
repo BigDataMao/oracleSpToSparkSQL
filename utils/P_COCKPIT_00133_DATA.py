@@ -533,3 +533,4 @@ def p_cockpit_00133_data(spark, busi_date):
         partition_value=i_month_id
     )
 
+    logging.info("ddw.T_COCKPIT_00133写入完成")
