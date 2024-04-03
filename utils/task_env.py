@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, col, coalesce, expr
+from pyspark.sql.functions import lit, col, coalesce, expr, when
 
 
 # spark入口
@@ -74,7 +74,13 @@ def update_dataframe(df_to_update, df_use_me, join_columns, update_columns):
 
     for column in update_columns:
         new_col_name = column + "_new"
-        df_result = df_result.withColumn(new_col_name, coalesce(df_use_me[column], df_to_update[column]))
+        df_result = df_result.withColumn(
+            new_col_name,
+            when(
+                expr(join_condition),
+                coalesce(df_use_me[column], df_to_update[column])
+            ).otherwise(col("a." + column))
+        )
         df_result = df_result.drop(column)
         df_result = df_result.withColumnRenamed(new_col_name, column)
 
