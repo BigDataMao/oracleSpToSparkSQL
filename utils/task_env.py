@@ -34,9 +34,19 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
         if c not in df_result.columns:
             df_result = df_result.withColumn(c, lit(None))
 
+    # # 如果是分区表，添加分区列和值
+    # if partition_column is not None and partition_value is not None:
+    #     df_result = df_result.withColumn(partition_column, lit(partition_value))
+
     # 如果是分区表，添加分区列和值
-    if partition_column is not None and partition_value is not None:
-        df_result = df_result.withColumn(partition_column, lit(partition_value))
+    if isinstance(partition_column, str):
+        partition_column = [partition_column]
+    if isinstance(partition_value, str):
+        partition_value = [partition_value]
+
+    if partition_column and partition_value:
+        for column, value in zip(partition_column, partition_value):
+            df_result = df_result.withColumn(column, lit(value))
 
     """
     以下代码用于处理df_result中的列数量比Hive表中的列多的情况
