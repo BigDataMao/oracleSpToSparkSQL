@@ -800,3 +800,14 @@ def p_cockpit_00135_data(spark, busi_date):
             lit(1)
         ).otherwise(lit(0))
     )
+
+    return_to_hive(
+        spark=spark,
+        df_result=df_135_y,
+        target_table="ddw.P_COCKPIT_00135_DATA",
+        insert_mode="overwrite",
+        partition_column="year_id",
+        partition_value=i_year_id
+    )
+
+    logging.info("P_COCKPIT_00135_DATA,数据处理完成")
