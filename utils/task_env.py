@@ -59,7 +59,7 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
         .map(lambda r: r[0]) \
         .collect()
     # 选择与Hive表列名匹配的列
-    selected_columns = list(filter(lambda column: column in hive_table_columns, df_result.columns))
+    selected_columns = list(filter(lambda col_check: col_check in hive_table_columns, df_result.columns))
     df_result = df_result.select(selected_columns)
 
     # 插入数据
