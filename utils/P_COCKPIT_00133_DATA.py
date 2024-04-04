@@ -334,7 +334,7 @@ def p_cockpit_00133_data(spark, busi_date):
         on=col("b.department_id") == col("f.chdeptcode"),
         how="inner"
     ).join(
-        other=spark.table("ods._CTP63_T_DS_DC_INVESTOR").alias("c"),
+        other=spark.table("ods.CTP63_T_DS_DC_INVESTOR").alias("c"),
         on=col("a.investor_id") == col("c.investor_id"),
         how="inner"
     ).join(

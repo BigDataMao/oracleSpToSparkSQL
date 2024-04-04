@@ -648,7 +648,7 @@ def p_cockpit_00135_data(spark, busi_date):
         .filter(
         col("a.busi_date").between(v_last_year_begin_date, v_last_year_end_date)
     ).join(
-        other=spark.table("h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(
             col("a.id_no") == col("b.id_no"),
             col("a.client_name") == col("b.client_name")
