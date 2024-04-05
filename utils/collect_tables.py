@@ -38,23 +38,27 @@ print("\n" * 3)
 # 获取oracle_tables
 oracle_tables = []
 for param in hive_tables:
+    table = None
     # 规则1: 将以 ddw 开头的表名替换为 cf_busimg 开头
     if param.lower().startswith("ddw"):
-        param = "cf_busimg" + param[3:]
-    # # 规则2: 去掉 "ods." 前缀，并将第一个下划线 "_" 改成点号 "."
-    # if param.lower().startswith("ods."):
-    #     param = param[4:].replace("_", ".", 1)
-    # oracle_tables.append(param)
+        table_name = param[4:]
+        full_name = "cf_busimg" + param[3:]
+        table = ("CF_BUSIMG", table_name, full_name)
 
     # 规则2: 去掉 "ods." 前缀，并将第一个下划线 "_" 改成点号 "."
     if param.lower().startswith("ods."):
-        table_name = param[4:]
+        tmp_name = param[4:]
+        db_name = None
+        table_name = None
+        full_name = None
         for user in users:
-            if table_name.lower().startswith(user.lower()):
-                table_name = user + "." + table_name[len(user)+1:]
+            if tmp_name.lower().startswith(user.lower()):
+                db_name = user
+                table_name = tmp_name[len(user)+1:]
+                full_name = user + "." + table_name
                 break
-        param = table_name
-    oracle_tables.append(param)
+        table = (db_name, table_name, full_name)
+    oracle_tables.append(table)
 
 # 打印结果
 print("下面是oracle表\n")
@@ -66,7 +70,7 @@ print("\n" * 3)
 # Oracle 连接信息
 username = 'wolf'
 password = 'wolf'
-dsn = 'txy:1136/wolf'  # 格式如: host:port/service_name
+dsn = 'txy:1136/wolfdb'  # 格式如: host:port/service_name
 
 # 连接到 Oracle 数据库
 connection = cx_Oracle.connect(username, password, dsn)
@@ -75,14 +79,28 @@ connection = cx_Oracle.connect(username, password, dsn)
 cursor = connection.cursor()
 
 # 打印每个表的建表语句
-for table_name in oracle_tables:
-    # 执行 SQL 查询以获取表的建表语句
-    cursor.execute("SELECT dbms_metadata.get_ddl('TABLE', :table_name) FROM dual", {'table_name': table_name})
-    # 获取查询结果
-    result = cursor.fetchone()
-    # 打印建表语句
-    print("建表语句 for {table_name}:")
-    print(result[0])
+for table in oracle_tables:
+    try:
+        # 执行 SQL 查询以获取表的建表语句
+        cursor.execute(
+            "SELECT dbms_metadata.get_ddl('TABLE', :table_name, :db_name) FROM dual",
+            {'table_name': table[1].upper(),
+             'db_name': table[0].upper()}
+        )
+        # 获取查询结果
+        result = cursor.fetchone()
+        # 打印建表语句
+        print("建表语句 for {full_name}:".format(full_name=table[2]))
+        print(result[0], "\n" * 3)
+    except cx_Oracle.DatabaseError as e:
+        error, = e.args
+        # 如果是ORA-31603错误，表示对象不存在，继续处理下一个表
+        if error.code == 31603:
+            print(f"表 {table[2]} 不存在")
+            continue
+        else:
+            # 其他错误，打印错误信息
+            print(f"处理表 {table[2]} 时发生错误: {error.message}")
 
 # 关闭游标和连接
 cursor.close()
