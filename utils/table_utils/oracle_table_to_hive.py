@@ -13,15 +13,10 @@ def oracle_table_to_hive(oracle_table_ddl):
     :param oracle_table_ddl: str, oracle的建表语句
     :return: str, hive的建表语句
     """
-    # 将建表语句中的所有换行符替换为空格
-    oracle_table_ddl = re.sub(r"\n", " ", oracle_table_ddl)
-    # 将建表语句中的所有制表符替换为空格
-    oracle_table_ddl = re.sub(r"\t", " ", oracle_table_ddl)
-    # 将建表语句中的所有多个空格替换为一个空格
-    oracle_table_ddl = re.sub(r"\s+", " ", oracle_table_ddl)
+
 
     # 从建表语句中找到表名
-    table_name = re.search(r"CREATE TABLE ([^ ]*) ", oracle_table_ddl).group(1)
+    table_name = re.search(r"create table ([^ ]*) ", oracle_table_ddl).group(1)
 
     # 从建表语句中找到字段定义部分
     columns = re.search(r"\((.*)\)", oracle_table_ddl).group(1)
