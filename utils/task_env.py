@@ -66,7 +66,7 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
     df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
 
 
-def update_dataframe(df_to_update, df_use_me, join_columns, update_columns):
+def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filter_condition=None):
     df_to_update = df_to_update.alias("a")
     df_use_me = df_use_me.alias("b")
     join_condition = " and ".join(["a.{} = b.{}".format(column, column) for column in join_columns])
@@ -77,7 +77,8 @@ def update_dataframe(df_to_update, df_use_me, join_columns, update_columns):
         df_result = df_result.withColumn(
             new_col_name,
             when(
-                expr(join_condition),
+                expr(join_condition) &
+                expr(filter_condition),
                 coalesce(df_use_me[column], df_to_update[column])
             ).otherwise(col("a." + column))
         )
