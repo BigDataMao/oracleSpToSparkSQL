@@ -438,9 +438,9 @@ def p_cockpit_00135_data(spark, busi_date):
 
     tmp = spark.table("ods.CTP63_T_DS_CRM_BROKER_INVESTOR_RELA").alias("a") \
         .filter(
-        (lit("a.RELA_STS") == lit("A")) &
-        (lit("a.APPROVE_STS") == lit("0")) &
-        (lit("a.data_pct").isNotNull())
+        (col("a.RELA_STS") == lit("A")) &
+        (col("a.APPROVE_STS") == lit("0")) &
+        (col("a.data_pct").isNotNull())
     ).join(
         other=spark.table("ods.CTP63_T_DS_CRM_BROKER").alias("b"),
         on=(col("a.broker_id") == col("b.broker_id")),
