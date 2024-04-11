@@ -4,6 +4,23 @@
 将oracle的建表语句转化为hive的建表语句
 """
 
+
+"""
+| 数据类型    | Oracle             | Hive          |
+| ---------- | ------------------ | ------------- |
+| 字符串      | CHAR               | STRING        |
+| 字符串      | VARCHAR            | STRING        |
+| 字符串      | VARCHAR2           | STRING        |
+| 字符串      | VARCHAR(n)         | STRING        |
+| 字符串      | VARCHAR2(n)        | STRING        |
+| 文本        | CLOB               | STRING        |
+| 字符串      | DATE               | STRING        |
+| 数值        | NUMBER             | DOUBLE        |
+| 数值        | NUMBER(p,s)        | DOUBLE        |
+| 数值        | INTEGER            | DOUBLE        |
+
+"""
+
 import re
 
 
