@@ -111,13 +111,13 @@ def p_cockpit_00092_data(spark, busi_date):
     dict_data = {
         "this_year": {
             "suffix": "jgx",
-            "begin": v_begin_month,
-            "end": v_end_month,
+            "begin": v_begin_date,
+            "end": v_end_date,
         },
         "last_year": {
             "suffix": "jgx_last",
-            "begin": v_last_begin_month,
-            "end": v_last_end_month,
+            "begin": v_last_begin_date,
+            "end": v_last_end_date,
         }
     }
 
