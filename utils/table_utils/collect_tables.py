@@ -4,10 +4,12 @@ import os
 import re
 import cx_Oracle
 
+from utils.table_utils.oracle_table_to_hive import oracle_ddl_to_hive
+
 # Oracle 连接信息
 username = 'wolf'
 password = 'wolf'
-dsn = 'txy:1136/wolfdb'
+dsn = 'wolf:1521/wolfdb'
 # 存储所有的表相关信息
 table_info = {
     # "hive_table_name": {
@@ -18,7 +20,11 @@ table_info = {
     # }
 }
 
-path_cockpit = "utils"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+print(script_dir)
+# 上级目录
+cockpit_dir = os.path.dirname(script_dir)
+print(cockpit_dir)
 
 
 def collect_tables():
@@ -27,9 +33,9 @@ def collect_tables():
     # 用户提供的数据库名列表
     oracle_users = ["CTP63", "CF_STAT", "FUTURES"]
     # 遍历当前目录下以 P_COCKPIT 开头的文件
-    for filename in os.listdir(path_cockpit):
-        if filename.startswith('P_COCKPIT'):
-            with open(path_cockpit + "/" + filename, 'r', encoding='utf-8') as file:
+    for filename in os.listdir(cockpit_dir):
+        if filename.startswith('P_COCKPIT_00092'):
+            with open(cockpit_dir + "/" + filename, 'r', encoding='utf-8') as file:
                 content = file.read()
                 # 使用正则表达式找到 spark.table() 方法内部的参数
                 spark_table_params = re.findall(r'spark\.table\(["\']([^"\']*)["\']\)', content)
@@ -128,6 +134,13 @@ def collect_tables():
                 # 其他错误，打印错误信息
                 print("处理表 %s 时发生错误:" % error.message)
                 table["oracle_ddl"] = None
+                continue
+
+        except Exception as ex:
+            # 捕获所有其他异常类型
+            print("处理表时发生错误:", ex)
+            table["oracle_ddl"] = None
+            continue
 
     # 关闭游标和连接
     cursor.close()
@@ -136,3 +149,20 @@ def collect_tables():
     json_str = json.dumps(table_info, indent=4)
     print(json_str)
     return table_info
+
+
+if __name__ == '__main__':
+    tmp_ddl = ""
+    table_info = collect_tables()
+    for key, value in table_info.items():
+        arr_1 = oracle_ddl_to_hive(value["oracle_ddl"])
+        if arr_1:
+            for name, name_type in arr_1:
+                if tmp_ddl == "":
+                    tmp_ddl = name + "\t" + name_type
+                else:
+                    tmp_ddl = tmp_ddl + ",\n" + name + "\t" + name_type
+            hive_ddl = \
+                f"""create table {key}(\n{tmp_ddl});
+                """
+            print(hive_ddl)
