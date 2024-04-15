@@ -1,15 +1,29 @@
 # -*- coding: utf-8 -*-
 import json
+import logging
 import os
 import re
+import oracledb
 import cx_Oracle
 
 from utils.table_utils.oracle_table_to_hive import oracle_ddl_to_hive
 
+# lib_dir = r"/u01/app/wolf/oracle/product/11.2.0/dbhome_1/lib"
+# cx_Oracle.init_oracle_client(lib_dir=lib_dir)
+
+# os.environ["ORACLE_HOME"] = r'/u01/app/wolf/oracle/product/11.2.0/dbhome_1'
+# os.environ["ORACLE_BASE"] = r'/u01/app/wolf/oracle'
+# os.environ["ORACLE_SID"] = 'WOLF'
+# os.environ["LD_LIBRARY_PATH"] = r'/u01/app/wolf/oracle/product/11.2.0/dbhome_1/lib'
+# os.environ['NLS_LANG'] = 'AMERICAN_AMERICA.UTF8'
+# os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+# os.environ['NLS_DATE_FORMAT'] = 'YYYY-MM-DD'
+
 # Oracle 连接信息
 username = 'wolf'
 password = 'wolf'
-dsn = 'wolf:1521/wolfdb'
+dsn = '192.168.25.19:1521/WOLF'
+# dsn = 'wolf:1521/wolfdb'
 # 存储所有的表相关信息
 table_info = {
     # "hive_table_name": {
@@ -102,10 +116,29 @@ def collect_tables():
     print(json_str)
 
     # 连接到 Oracle 数据库
-    connection = cx_Oracle.connect(username, password, dsn)
+    # con = cx_Oracle.connect(
+    #     username,
+    #     password,
+    #     dsn,
+    #     encoding="UTF-8",
+    #     nencoding="UTF-8"
+    # )
+    # logging.info("连接到 Oracle 数据库")
+    # cursor = con.cursor()
 
-    # 创建游标
-    cursor = connection.cursor()
+    # 用oracledb连接数据库
+    con = oracledb.connect(
+        user=username,
+        password=password,
+        dsn=dsn
+    )
+
+    # 获取游标
+    cursor = con.cursor()
+
+
+
+
 
     # 打印每个表的建表语句
     for table in table_info.values():
@@ -144,7 +177,7 @@ def collect_tables():
 
     # 关闭游标和连接
     cursor.close()
-    connection.close()
+    con.close()
 
     json_str = json.dumps(table_info, indent=4)
     print(json_str)
