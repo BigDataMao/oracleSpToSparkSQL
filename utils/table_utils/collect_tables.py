@@ -23,6 +23,7 @@ from utils.table_utils.oracle_table_to_hive import oracle_ddl_to_hive
 username = 'wolf'
 password = 'wolf'
 dsn = '192.168.25.19:1521/WOLF'
+oracledb.init_oracle_client(lib_dir=r'/usr/lib/oracle/11.2/client64/lib')  # 针对oracle11.2的老版本需要采用这种厚模式
 # dsn = 'wolf:1521/wolfdb'
 # 存储所有的表相关信息
 table_info = {
@@ -127,57 +128,65 @@ def collect_tables():
     # cursor = con.cursor()
 
     # 用oracledb连接数据库
-    con = oracledb.connect(
+    # con = oracledb.connect(
+    #     user=username,
+    #     password=password,
+    #     dsn=dsn
+    # )
+    # cursor = con.cursor()
+
+    # 用oracledb的thick模式
+    pool = oracledb.create_pool(
         user=username,
         password=password,
-        dsn=dsn
+        dsn=dsn,
+        min=1,
+        max=5,
+        increment=1,
     )
 
-    # 获取游标
-    cursor = con.cursor()
+    oapool = pool.acquire()
+    with oapool.cursor() as cursor:
+        # 打印每个表的建表语句
+        for table in table_info.values():
+            try:
+                # 执行 SQL 查询以获取表的建表语句 (DDL)
+                cursor.execute(
+                    "SELECT DBMS_METADATA.get_ddl('TABLE', :table_name, :db_name) FROM DUAL",
+                    {'table_name': table["oracle_table"].upper(), 'db_name': table["oracle_db"].upper()}
+                )
+                # 获取查询结果
+                result = cursor.fetchone()
 
+                # 将 cx_Oracle.LOB 对象转换为字符串
+                oracle_ddl = result[0].read()
+                print(oracle_ddl)
+                table["oracle_ddl"] = oracle_ddl
 
+            except cx_Oracle.DatabaseError as e:
+                error, = e.args
+                # 如果是ORA-31603错误，表示对象不存在，继续处理下一个表
+                if error.code == 31603:
+                    print("表 %s 不存在" % table["oracle_full_name"])
+                    table["oracle_ddl"] = None
+                    continue
+                else:
+                    # 其他错误，打印错误信息
+                    print("处理表 %s 时发生错误:" % error.message)
+                    table["oracle_ddl"] = None
+                    continue
 
-
-
-    # 打印每个表的建表语句
-    for table in table_info.values():
-        try:
-            # 执行 SQL 查询以获取表的建表语句 (DDL)
-            cursor.execute(
-                "SELECT DBMS_METADATA.get_ddl('TABLE', :table_name, :db_name) FROM DUAL",
-                {'table_name': table["oracle_table"].upper(), 'db_name': table["oracle_db"].upper()}
-            )
-            # 获取查询结果
-            result = cursor.fetchone()
-
-            # 将 cx_Oracle.LOB 对象转换为字符串
-            oracle_ddl = result[0].read()
-            print(oracle_ddl)
-            table["oracle_ddl"] = oracle_ddl
-
-        except cx_Oracle.DatabaseError as e:
-            error, = e.args
-            # 如果是ORA-31603错误，表示对象不存在，继续处理下一个表
-            if error.code == 31603:
-                print("表 %s 不存在" % table["oracle_full_name"])
+            except Exception as ex:
+                # 捕获所有其他异常类型
+                print("处理表时发生错误:", ex)
                 table["oracle_ddl"] = None
                 continue
-            else:
-                # 其他错误，打印错误信息
-                print("处理表 %s 时发生错误:" % error.message)
-                table["oracle_ddl"] = None
-                continue
-
-        except Exception as ex:
-            # 捕获所有其他异常类型
-            print("处理表时发生错误:", ex)
-            table["oracle_ddl"] = None
-            continue
 
     # 关闭游标和连接
-    cursor.close()
-    con.close()
+    pool.release(oapool)
+    pool.close()
+
+
 
     json_str = json.dumps(table_info, indent=4)
     print(json_str)
