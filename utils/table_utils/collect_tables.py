@@ -3,28 +3,16 @@ import json
 import logging
 import os
 import re
+
 import oracledb
-import cx_Oracle
 
 from utils.table_utils.oracle_table_to_hive import oracle_ddl_to_hive
-
-# lib_dir = r"/u01/app/wolf/oracle/product/11.2.0/dbhome_1/lib"
-# cx_Oracle.init_oracle_client(lib_dir=lib_dir)
-
-# os.environ["ORACLE_HOME"] = r'/u01/app/wolf/oracle/product/11.2.0/dbhome_1'
-# os.environ["ORACLE_BASE"] = r'/u01/app/wolf/oracle'
-# os.environ["ORACLE_SID"] = 'WOLF'
-# os.environ["LD_LIBRARY_PATH"] = r'/u01/app/wolf/oracle/product/11.2.0/dbhome_1/lib'
-# os.environ['NLS_LANG'] = 'AMERICAN_AMERICA.UTF8'
-# os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
-# os.environ['NLS_DATE_FORMAT'] = 'YYYY-MM-DD'
 
 # Oracle 连接信息
 username = 'wolf'
 password = 'wolf'
 dsn = '192.168.25.19:1521/WOLF'
 oracledb.init_oracle_client(lib_dir=r'/usr/lib/oracle/11.2/client64/lib')  # 针对oracle11.2的老版本需要采用这种厚模式
-# dsn = 'wolf:1521/wolfdb'
 # 存储所有的表相关信息
 table_info = {
     # "hive_table_name": {
@@ -34,12 +22,12 @@ table_info = {
     #     "oracle_ddl": "oracle_ddl"
     # }
 }
-
+# 脚本目录
 script_dir = os.path.dirname(os.path.abspath(__file__))
-print(script_dir)
+logging.info("脚本目录: %s", script_dir)
 # 上级目录
 cockpit_dir = os.path.dirname(script_dir)
-print(cockpit_dir)
+logging.info("上级目录: %s", cockpit_dir)
 
 
 def collect_tables():
@@ -116,25 +104,6 @@ def collect_tables():
 
     print(json_str)
 
-    # 连接到 Oracle 数据库
-    # con = cx_Oracle.connect(
-    #     username,
-    #     password,
-    #     dsn,
-    #     encoding="UTF-8",
-    #     nencoding="UTF-8"
-    # )
-    # logging.info("连接到 Oracle 数据库")
-    # cursor = con.cursor()
-
-    # 用oracledb连接数据库
-    # con = oracledb.connect(
-    #     user=username,
-    #     password=password,
-    #     dsn=dsn
-    # )
-    # cursor = con.cursor()
-
     # 用oracledb的thick模式
     pool = oracledb.create_pool(
         user=username,
@@ -145,8 +114,8 @@ def collect_tables():
         increment=1,
     )
 
-    oapool = pool.acquire()
-    with oapool.cursor() as cursor:
+    oracle_pool = pool.acquire()
+    with oracle_pool.cursor() as cursor:
         # 打印每个表的建表语句
         for table in table_info.values():
             try:
@@ -163,7 +132,7 @@ def collect_tables():
                 print(oracle_ddl)
                 table["oracle_ddl"] = oracle_ddl
 
-            except cx_Oracle.DatabaseError as e:
+            except oracledb.DatabaseError as e:
                 error, = e.args
                 # 如果是ORA-31603错误，表示对象不存在，继续处理下一个表
                 if error.code == 31603:
@@ -183,10 +152,8 @@ def collect_tables():
                 continue
 
     # 关闭游标和连接
-    pool.release(oapool)
+    pool.release(oracle_pool)
     pool.close()
-
-
 
     json_str = json.dumps(table_info, indent=4)
     print(json_str)

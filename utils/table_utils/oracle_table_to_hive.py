@@ -91,7 +91,7 @@ def oracle_ddl_to_hive(oracle_ddl):
 
 
 if __name__ == '__main__':
-    oracle_ddl = """
+    oracle_ddl_str = """
     create table CF_BUSIMG.T_COCKPIT_BUSI_ANAL_TAR_RESP_Q
     (
         "busi_year"           VARCHAR2(4),
@@ -115,5 +115,5 @@ if __name__ == '__main__':
         );
     """
 
-    arr_1 = oracle_ddl_to_hive(oracle_ddl=oracle_ddl)
+    arr_1 = oracle_ddl_to_hive(oracle_ddl=oracle_ddl_str)
     print(arr_1)
