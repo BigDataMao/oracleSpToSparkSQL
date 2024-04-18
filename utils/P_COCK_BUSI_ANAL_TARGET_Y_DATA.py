@@ -42,3 +42,4 @@ def p_cock_busi_anal_target_y_data(spark, busi_date):
 
     # TODO:  更新指标数据--待更新
     logging.info("p_cock_busi_anal_target_y_data执行完成")
+    logging.info("本次任务为: 经营分析-业务单位-经营目标完成情况-按年落地")
