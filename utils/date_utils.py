@@ -3,6 +3,8 @@
 """
 专门处理日期参数的工具类
 """
+from datetime import datetime, timedelta
+
 from pyspark.sql.functions import col, min, max, count, lit
 
 pub_date_table = "edw.t10_pub_date"
@@ -31,8 +33,8 @@ def get_date_period_and_days(
     # 基于开始和结束月份进行过滤
     if begin_month and end_month:
         month_range_filter = (
-            (col("busi_date").substr(1, 6) >= begin_month) &
-            (col("busi_date").substr(1, 6) <= end_month)
+                (col("busi_date").substr(1, 6) >= begin_month) &
+                (col("busi_date").substr(1, 6) <= end_month)
         )
     elif begin_month:
         month_range_filter = (col("busi_date").substr(1, 6) >= begin_month)
@@ -59,12 +61,12 @@ def get_date_period_and_days(
     # Apply all filters
     df_date = spark.table(pub_date_table) \
         .filter(
-            date_filter &
-            month_range_filter &
-            month_filter &
-            trade_day_filter &
-            year_filter &
-            (col("market_no") == "1")
+        date_filter &
+        month_range_filter &
+        month_filter &
+        trade_day_filter &
+        year_filter &
+        (col("market_no") == "1")
     ).agg(
         min("busi_date").alias("v_begin_date"),
         max("busi_date").alias("v_end_date"),
@@ -78,3 +80,34 @@ def get_date_period_and_days(
     else:
         return (df_date.first()["v_begin_date"],
                 df_date.first()["v_end_date"])
+
+
+def get_busi_week_int(busi_date):
+    """
+    获取给定日期所在年的第几周
+    :param busi_date: 日期字符串, 格式为 'YYYYMMDD'
+    :return: 第几周, 整数
+    """
+    # 将日期字符串转换为 datetime 对象
+    date_object = datetime.strptime(busi_date, '%Y%m%d')
+    # 获取给定日期所在年的第几周
+    v_busi_week = date_object.isocalendar()[1]
+    return v_busi_week
+
+
+def get_mon_sun_str(busi_date):
+    """
+    获取给定日期所在周的星期一和星期日
+    :param busi_date: 日期字符串, 格式为 'YYYYMMDD'
+    :return: 星期一和星期日的日期字符串, 格式为 'YYYYMMDD'
+    """
+    # 将日期字符串转换为 datetime 对象
+    date_object = datetime.strptime(busi_date, '%Y%m%d')
+    # 找到给定日期所在周的星期一
+    monday = date_object - timedelta(days=date_object.weekday())
+    # 找到给定日期所在周的星期日
+    sunday = monday + timedelta(days=6)
+    # 将日期对象转换为字符串
+    v_begin_date = monday.strftime('%Y%m%d')
+    v_end_date = sunday.strftime('%Y%m%d')
+    return v_begin_date, v_end_date
