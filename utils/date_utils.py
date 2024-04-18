@@ -4,6 +4,7 @@
 专门处理日期参数的工具类
 """
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 from pyspark.sql.functions import col, min, max, count, lit
 
@@ -127,3 +128,19 @@ def get_quarter(busi_date):
     # 获取给定日期所在季度
     v_quarter = (date_object.month - 1) // 3 + 1
     return str(v_quarter)
+
+
+def get_previous_year_date(busi_date):
+    """
+    获取给定日期的前一年日期
+    :param busi_date: 日期字符串, 格式为 'YYYYMMDD'
+    :return: 前一年日期字符串, 格式为 'YYYYMMDD',闰年2月29日返回2月28日
+    """
+    # 将输入日期字符串解析为 datetime 对象
+    input_date = datetime.strptime(busi_date, '%Y%m%d')
+
+    # 计算前一年的日期
+    previous_year_date = input_date - relativedelta(years=1)
+
+    # 将结果格式化为字符串并返回
+    return previous_year_date.strftime('%Y%m%d')
