@@ -3,29 +3,22 @@
 客户分析落地表(客户分析-业务单位-)
 """
 import logging
-from datetime import datetime, timedelta
 
 from pyspark.sql import Window
 from pyspark.sql.functions import col, lit, sum, rank
 
-from utils.task_env import return_to_hive, update_dataframe
+from utils.date_utils import get_busi_week_int, get_mon_sun_str
+from utils.task_env import return_to_hive
 
 
 def p_cockpit_analyse_top_data(spark, busi_date):
     v_busi_year = busi_date[:4]
     v_rank_no = 9
 
-    # 将日期字符串转换为 datetime 对象
-    date_object = datetime.strptime(busi_date, '%Y%m%d')
     # 获取给定日期所在年的第几周
-    v_busi_week = date_object.isocalendar()[1]
-    # 找到给定日期所在周的星期一
-    monday = date_object - timedelta(days=date_object.weekday())
-    # 找到给定日期所在周的星期日
-    sunday = monday + timedelta(days=6)
-    # 将日期对象转换为字符串
-    v_begin_date = monday.strftime('%Y%m%d')
-    v_end_date = sunday.strftime('%Y%m%d')
+    v_busi_week = get_busi_week_int(busi_date)
+    # 找到给定日期所在周的星期一和星期日
+    v_begin_date, v_end_date = get_mon_sun_str(busi_date)
 
     # TODO: CF_BUSIMG.T_COCKPIT_CLIENT_ANALYSE_TOP做成分区表,并且分区字段为busi_year, busi_week
 
