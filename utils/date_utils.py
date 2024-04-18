@@ -111,3 +111,19 @@ def get_mon_sun_str(busi_date):
     v_begin_date = monday.strftime('%Y%m%d')
     v_end_date = sunday.strftime('%Y%m%d')
     return v_begin_date, v_end_date
+
+
+def get_quarter(busi_date):
+    """
+    获取给定日期所在季度
+    :param busi_date: 日期字符串, 格式为 'YYYYMMDD'或者'YYYYMM'
+    :return: 季度, 整数字符串
+    """
+
+    if len(busi_date) == 6:
+        busi_date = busi_date + "01"
+    # 将日期字符串转换为 datetime 对象
+    date_object = datetime.strptime(busi_date, '%Y%m%d')
+    # 获取给定日期所在季度
+    v_quarter = (date_object.month - 1) // 3 + 1
+    return str(v_quarter)
