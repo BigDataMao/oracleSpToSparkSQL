@@ -4,10 +4,9 @@
 """
 import logging
 
-from pyspark.sql import Window
-from pyspark.sql.functions import col, lit, sum, rank, when
+from pyspark.sql.functions import col, lit, sum, when
 
-from utils.date_utils import get_busi_week_int, get_mon_sun_str, get_previous_year_date, get_date_period_and_days
+from utils.date_utils import get_previous_year_date, get_date_period_and_days
 from utils.task_env import return_to_hive, update_dataframe
 
 
@@ -109,25 +108,6 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         col("end_rights")
     )
 
-    """
-    tmp_result as
-     (select t.Business_Line_Id,
-             sum(t.end_rights) as total_end_rights,
-             sum(case
-                   when t.is_new_flag = '1' then
-                    t.end_rights
-                   else
-                    0
-                 end) as new_end_rights,
-             sum(case
-                   when t.is_new_flag = '0' then
-                    t.end_rights
-                   else
-                    0
-                 end) as stock_end_rights
-        from tmp_new t
-       group by t.Business_Line_Id),
-    """
     tmp_result = tmp_new.alias("t") \
         .groupBy(
         col("t.Business_Line_Id")
