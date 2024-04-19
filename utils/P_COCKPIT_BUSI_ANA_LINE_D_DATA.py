@@ -39,6 +39,19 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         col("t.business_line_id")
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_x,
+        target_table="ddw.T_COCKPIT_BUSI_ANALYSE_LINE_D",
+        insert_mode="overwrite",
+        partition_column="BUSI_DATE",
+        partition_value=busi_date
+    )
+
+    df_x = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_LINE_D").filter(
+        col("BUSI_DATE") == busi_date
+    )
+
     """
     更新数据
     业务结构-期末权益-存量客户
