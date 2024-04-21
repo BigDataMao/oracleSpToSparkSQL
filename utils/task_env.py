@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import functools
+import logging
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, col, coalesce, expr, when
 
@@ -90,3 +93,28 @@ def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filt
         df_result = df_result.drop(col("b." + column))
 
     return df_result
+
+
+def log(func):
+    """
+    装饰器，用于在函数调用前后打印日志
+    :param func: 被装饰的函数
+    :return wrapper: 装饰后的函数
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        func_comment = func.__doc__
+        func_name = func.__name__
+
+        logging.info(f"开始执行函数: {func_name}")
+        if func_comment:
+            logging.info("函数功能: %s", func_comment)
+        else:
+            logging.info("没有找到%s函数的功能注释。", func_name)
+        result_func = func(*args, **kwargs)
+        logging.info(f"函数 {func_name} 执行完成")
+
+        return result_func
+
+    return wrapper
