@@ -51,6 +51,11 @@ def find_matching_parentheses(s):
 
 
 def oracle_ddl_to_hive(oracle_ddl):
+    """
+    处理oracle的ddl语句,提取字段名和字段类型,并将字段类型映射为hive的数据类型
+    :param oracle_ddl: oracle的ddl语句
+    :return pure_ddl: 映射为hive的数据类型,返回一个二维数组
+    """
 
     if oracle_ddl is None:
         return None
