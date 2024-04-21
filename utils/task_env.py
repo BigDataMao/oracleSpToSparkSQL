@@ -109,14 +109,14 @@ def log(func):
         func_name = func.__name__
 
         begin_time = datetime.datetime.now()
-        logging.info(f"开始执行函数: {func_name}")
+        logging.info("函数 %s 开始执行", func_name)
         if func_comment:
-            logging.info("函数功能: %s", func_comment)
+            logging.info("函数 %s 它的功能是: %s", func_name, func_comment.strip())
         else:
             logging.info("没有找到%s函数的功能注释。", func_name)
         result_func = func(*args, **kwargs)
         end_time = datetime.datetime.now()
-        logging.info(f"函数 {func_name} 执行完成")
+        logging.info("函数 %s 执行完成", func_name)
         duration = end_time - begin_time
         # 转成分秒,整数
         duration = divmod(duration.seconds, 60)
