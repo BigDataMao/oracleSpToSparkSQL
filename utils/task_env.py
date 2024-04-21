@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import datetime
 import functools
 import logging
 
@@ -107,13 +108,19 @@ def log(func):
         func_comment = func.__doc__
         func_name = func.__name__
 
+        begin_time = datetime.datetime.now()
         logging.info(f"开始执行函数: {func_name}")
         if func_comment:
             logging.info("函数功能: %s", func_comment)
         else:
             logging.info("没有找到%s函数的功能注释。", func_name)
         result_func = func(*args, **kwargs)
+        end_time = datetime.datetime.now()
         logging.info(f"函数 {func_name} 执行完成")
+        duration = end_time - begin_time
+        # 转成分秒,整数
+        duration = divmod(duration.seconds, 60)
+        logging.info("函数 %s 执行时间: %s 分 %s 秒", func_name, duration[0], duration[1])
 
         return result_func
 
