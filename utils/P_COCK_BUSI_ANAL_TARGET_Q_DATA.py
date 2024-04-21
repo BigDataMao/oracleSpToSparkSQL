@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 
 def p_cock_busi_anal_target_q_data(spark, busi_date):
     v_busi_year = busi_date[:4]
-    v_busi_quarter = get_quarter()
+    v_busi_quarter = get_quarter(busi_date)
 
     """
     考核指标：
