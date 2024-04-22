@@ -6,6 +6,7 @@ from utils.date_utils import *
 from utils.task_env import *
 
 
+@log
 def p_cockpit_busi_analyse_m_data(spark, busi_date):
     """
     经营分析-业务单位-按月落地
