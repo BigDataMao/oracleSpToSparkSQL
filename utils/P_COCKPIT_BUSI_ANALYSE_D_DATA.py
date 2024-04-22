@@ -158,7 +158,7 @@ def p_cockpit_busi_analyse_d_data(spark, busi_date):
         ).otherwise(0).alias("END_RIGHTS_YOY")
     )
 
-    update_dataframe(
+    df_d = update_dataframe(
         df_to_update=df_d,
         df_use_me=df_y,
         join_columns=["OA_BRANCH_ID"],
