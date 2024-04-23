@@ -1176,11 +1176,11 @@ def p_cockpit_client_analyse_data(spark, busi_date):
         :return: DataFrame
         """
 
-        df_tmp = spark.table("cf_crmmg.t_his_label_client").alias("t") \
+        df_tmp = spark.table("ods.T_crmmg_HIS_LABEL_CLIENT").alias("t") \
             .filter(
             (col("t.months") == v_busi_month)
         ).join(
-            other=spark.table("cf_crmmg.t_label").alias("c"),
+            other=spark.table("ods.t_crmmg_label").alias("c"),
             on=(
                     col("t.label_id") == col("c.label_id")
             ),
