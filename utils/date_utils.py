@@ -171,17 +171,15 @@ def is_trade_day_check(df_pub_date, busi_date):
     :return: 是否交易日, 布尔值
     """
     # 从数据库中查询给定日期的交易标志
-    df_trade_flag = df_pub_date \
+    trade_flag_count = df_pub_date \
         .filter(
             (col("busi_date") == busi_date) &
             (col("trade_flag") == "1") &
             (col("market_no") == "1")
-        ).select(
-            count("*").alias("v_trade_flag")
-        )
+        ).count()
 
-    # 如果查询结果中有交易标志, 则返回 True, 否则返回 False
-    return df_trade_flag.first()["v_trade_flag"] > 0
+    # 返回是否存在交易标志的布尔值
+    return trade_flag_count > 0
 
 
 def get_trade_date(df_pub_date, busi_date, n):
