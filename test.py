@@ -1,28 +1,33 @@
 # -*- coding: utf-8 -*-
 # 本机运行测试任务: https://blog.csdn.net/qq_39950572/article/details/136260712
 # pip install pyspark==2.4.4
-
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import coalesce, lit, col
+from pyspark.sql.functions import udf
+from pyspark.sql.types import StringType
 
-from utils.task_env import update_dataframe
+from utils.date_utils import *
 
 spark = SparkSession.builder \
     .appName("test") \
-    .master("local") \
+    .enableHiveSupport() \
     .getOrCreate()
 
-data1 = [("Alice", "34", 0), ("Bob", "34", 0)]
-columns1 = ["name", "age", "salary"]
-df1 = spark.createDataFrame(data1, columns1).alias("a")
+get_trade_date_udf = udf(get_trade_date, StringType())
+# 创建测试DataFrame
+test_df = spark.createDataFrame([
+    ("20240101",),
+    ("20240102",),
+    ("20240103",),
+    ("20240104",),
+    ("20240105",)
+], ["busi_date"])
 
-data2 = [("Alice", "34", 0), ("Bob", "34", 0)]
-columns2 = ["name", "age", "salary"]
-df2 = spark.createDataFrame(data2, columns2).alias("b")
+# 添加交易日期列
+result_df = test_df.withColumn(
+    "trade_date",
+    get_trade_date_udf(spark, col("busi_date"), lit('0'))
+)
 
-df_3 = df1.join(df2, col("a.name") == col("b.name")) \
+result_df.show()
 
-df_3 = df_3.withColumn("salary_1", col("a.age")) \
-
-df_3.show()
 
