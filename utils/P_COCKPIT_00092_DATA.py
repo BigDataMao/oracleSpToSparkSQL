@@ -7,7 +7,7 @@ import logging
 
 from pyspark.sql.functions import col, sum, round, when, lit, count, coalesce
 
-from date_utils import get_date_period_and_days
+from utils.date_utils import get_date_period_and_days
 from utils.task_env import return_to_hive, update_dataframe
 
 logging.basicConfig(level=logging.INFO)
