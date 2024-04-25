@@ -163,29 +163,20 @@ def is_leap_year(year):
     return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
 
 
-def is_trade_day_check(df_pub_date, busi_date):
+def is_trade_day_check(list_pub_date, busi_date):
     """
-    判断给定日期是否交易日
-    :param df_pub_date: DataFrame, 包含日期表的数据
+    判断给定日期是否是交易日
+    :param list_pub_date: 包含交易日的列表
     :param busi_date: 日期字符串, 格式为 'YYYYMMDD'
-    :return: 是否交易日, 布尔值
+    :return: bool, True 如果是交易日，否则 False
     """
-    # 从数据库中查询给定日期的交易标志
-    trade_flag_count = df_pub_date \
-        .filter(
-            (col("busi_date") == busi_date) &
-            (col("trade_flag") == "1") &
-            (col("market_no") == "1")
-        ).count()
-
-    # 返回是否存在交易标志的布尔值
-    return trade_flag_count > 0
+    return busi_date in list_pub_date
 
 
-def get_trade_date(df_pub_date, busi_date, n):
+def get_trade_date(list_pub_date, busi_date, n):
     """
     获取给定日期之后或之前的第 n 个交易日
-    :param df_pub_date: DataFrame, 包含日期表的数据
+    :param list_pub_date: 包含交易日的列表
     :param busi_date: 日期字符串, 格式为 'YYYYMMDD'
     :param n: 整数, 表示第 n 个交易日
     :return: 第 n 个交易日的日期字符串, 格式为 'YYYYMMDD'
@@ -194,7 +185,7 @@ def get_trade_date(df_pub_date, busi_date, n):
     input_date = datetime.strptime(busi_date, '%Y%m%d')
 
     # 初始化input_date为交易日(往前找)
-    while not is_trade_day_check(df_pub_date, input_date.strftime('%Y%m%d')):
+    while not is_trade_day_check(list_pub_date, input_date.strftime('%Y%m%d')):
         input_date -= timedelta(days=1)
 
     # 计算第 n 个交易日的日期
@@ -205,7 +196,7 @@ def get_trade_date(df_pub_date, busi_date, n):
             # 将日期加一天
             trade_date += timedelta(days=1)
             # 如果加一天后是交易日, 则 n 减一
-            if is_trade_day_check(df_pub_date, trade_date.strftime('%Y%m%d')):
+            if is_trade_day_check(list_pub_date, trade_date.strftime('%Y%m%d')):
                 n -= 1
     else:
         # 如果 n 小于 0, 则向前查找第 n 个交易日
@@ -214,7 +205,7 @@ def get_trade_date(df_pub_date, busi_date, n):
             # 将日期减一天
             trade_date -= timedelta(days=1)
             # 如果减一天后是交易日, 则 n 加一
-            if is_trade_day_check(df_pub_date, trade_date.strftime('%Y%m%d')):
+            if is_trade_day_check(list_pub_date, trade_date.strftime('%Y%m%d')):
                 n += 1
 
     # 将结果格式化为字符串并返回
