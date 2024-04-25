@@ -20,6 +20,18 @@ def get_date_period_and_days(
         busi_month=None,
         is_trade_day=True
 ):
+    """
+    获取给定日期范围内的开始日期、结束日期和总天数
+    :param spark:
+    :param begin_date:
+    :param end_date:
+    :param begin_month:
+    :param end_month:
+    :param busi_year:
+    :param busi_month:
+    :param is_trade_day:
+    :return:
+    """
     # 基于开始和结束日期进行过滤
     if begin_date and end_date:
         date_filter = (col("busi_date").between(begin_date, end_date))
@@ -73,13 +85,9 @@ def get_date_period_and_days(
         count("*").alias("v_trade_days")
     )
 
-    if is_trade_day:
-        return (df_date.first()["v_begin_date"],
-                df_date.first()["v_end_date"],
-                df_date.first()["v_trade_days"])
-    else:
-        return (df_date.first()["v_begin_date"],
-                df_date.first()["v_end_date"])
+    return (df_date.first()["v_begin_date"],
+            df_date.first()["v_end_date"],
+            df_date.first()["v_trade_days"])
 
 
 def get_busi_week_int(busi_date):
