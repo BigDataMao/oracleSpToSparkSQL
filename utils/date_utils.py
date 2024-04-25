@@ -218,3 +218,28 @@ def get_trade_date(list_pub_date, busi_date, n):
 
     # 将结果格式化为字符串并返回
     return trade_date.strftime('%Y%m%d')
+
+
+def get_date_list(begin_date, end_date):
+    """
+    获取给定日期范围内的所有日期
+    :param begin_date: 开始日期字符串, 格式为 'YYYYMMDD'
+    :param end_date: 结束日期字符串, 格式为 'YYYYMMDD'
+    :return: 包含给定日期范围内所有日期的列表
+    """
+    # 将开始日期字符串解析为 datetime 对象
+    begin_date = datetime.strptime(begin_date, '%Y%m%d')
+    # 将结束日期字符串解析为 datetime 对象
+    end_date = datetime.strptime(end_date, '%Y%m%d')
+
+    # 初始化日期列表
+    date_list = []
+
+    # 从开始日期到结束日期遍历
+    while begin_date <= end_date:
+        # 将日期对象转换为字符串并添加到列表
+        date_list.append(begin_date.strftime('%Y%m%d'))
+        # 将日期加一天
+        begin_date += timedelta(days=1)
+
+    return date_list
