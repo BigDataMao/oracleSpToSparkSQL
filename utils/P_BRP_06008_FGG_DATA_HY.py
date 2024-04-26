@@ -8,6 +8,7 @@ from utils.date_utils import *
 from utils.task_env import *
 
 
+@log
 def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
     """
     资金对账表日和落地数据
@@ -17,7 +18,7 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
     get_trade_date_udf = udf(lambda x, n: get_trade_date(list_pub_date, x, n), StringType())
 
     # 日期处理
-    if is_trade_day_check(spark, i_begin_date):
+    if not is_trade_day_check(spark, i_begin_date):
         v_begin_date = get_trade_date(spark, i_begin_date, 1)
         v_begin_date_before = get_trade_date(spark, i_begin_date, -1)
     else:
@@ -26,7 +27,7 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
 
     v_end_date = i_end_date
 
-    if is_trade_day_check(spark, i_end_date):
+    if not is_trade_day_check(spark, i_end_date):
         v_end_date = get_trade_date(spark, v_end_date, 0)
 
     tmp_trade_date = spark.table("ddw.tmp_trade_date").alias("c") \
