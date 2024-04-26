@@ -102,8 +102,7 @@ def log(func):
     :param func: 被装饰的函数
     :return wrapper: 装饰后的函数
     """
-
-    @functools.wraps(func)
+    @functools.wraps(func)  # 这句前面不能有任何空行,否则解释器不会认为这是装饰器?
     def wrapper(*args, **kwargs):
         func_comment = func.__doc__
         func_name = func.__name__
