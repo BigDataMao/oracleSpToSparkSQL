@@ -70,7 +70,7 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
 
     # 取投资者保障基金比例
 
-    v_dratio = spark.table("cf_cspmg.t_csperson_fee").alias("a") \
+    v_dratio = spark.table("ods.t_Cspmg_Csperson_Fee").alias("a") \
         .filter(
         (col("a.fee_type") == "1003") &
         (col("a.use_status") == "0") &
