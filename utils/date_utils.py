@@ -5,7 +5,7 @@
 """
 from datetime import datetime, timedelta
 
-from pyspark.sql.functions import col, min, max, count, lit
+from pyspark.sql.functions import col, min, max, count, lit, countDistinct
 
 pub_date_table = "edw.t10_pub_date"
 
@@ -82,7 +82,7 @@ def get_date_period_and_days(
     ).agg(
         min("busi_date").alias("v_begin_date"),
         max("busi_date").alias("v_end_date"),
-        count("*").alias("v_trade_days")
+        countDistinct("busi_date").alias("v_trade_days")
     )
 
     return (df_date.first()["v_begin_date"],
