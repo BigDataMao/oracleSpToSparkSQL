@@ -22,7 +22,7 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
         v_begin_date = get_trade_date(spark, i_begin_date, 1)
         v_begin_date_before = get_trade_date(spark, i_begin_date, -1)
     else:
-        v_begin_date = i_end_date
+        v_begin_date = i_begin_date
         v_begin_date_before = v_begin_date
 
     v_end_date = i_end_date
