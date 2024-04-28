@@ -9,8 +9,6 @@ from pyspark.sql.functions import sum, round, count
 from utils.date_utils import get_date_period_and_days
 from utils.task_env import *
 
-logging.basicConfig(level=logging.INFO)
-
 
 @log
 def p_cockpit_00092_data(spark, busi_date):
