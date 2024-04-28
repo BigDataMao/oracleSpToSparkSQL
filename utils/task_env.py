@@ -27,6 +27,8 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
     用于将数据返回hive或hive分区表
     :return: none
     """
+    # 当前时间
+    begin_time = datetime.datetime.now()
     # 判断是否覆盖写
     if_overwrite = insert_mode == "overwrite"
 
@@ -68,6 +70,14 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
 
     # 插入数据
     df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
+    logging.info("数据已写入表: %s", target_table)
+    # 再次记录当前时间用于日志
+    end_time = datetime.datetime.now()
+    # 记录写入耗时
+    duration = end_time - begin_time
+    # 转成分秒,整数
+    duration = divmod(duration.seconds, 60)
+    logging.info("数据写入耗时: %s 分 %s 秒", duration[0], duration[1])
 
 
 def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filter_condition=None):
