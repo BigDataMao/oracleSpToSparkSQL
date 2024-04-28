@@ -3,16 +3,16 @@
 宏源-千万工程”指标落地数据
 逻辑依据: utils/P_COCKPIT_00092_DATA.sql
 """
-import logging
 
-from pyspark.sql.functions import col, sum, round, when, lit, count, coalesce
+from pyspark.sql.functions import sum, round, count
 
 from utils.date_utils import get_date_period_and_days
-from utils.task_env import return_to_hive, update_dataframe
+from utils.task_env import *
 
 logging.basicConfig(level=logging.INFO)
 
 
+@log
 def p_cockpit_00092_data(spark, busi_date):
     v_busi_year = busi_date[:4]
     v_begin_date = v_busi_year + "0101"
@@ -1495,5 +1495,3 @@ def p_cockpit_00092_data(spark, busi_date):
         partition_column=["busi_year"],
         partition_value=v_busi_year
     )
-
-    logging.info("cf_busimg.t_brp_00092分区[%s]数据计算完成", v_busi_year)
