@@ -6,6 +6,8 @@ import logging
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, col, coalesce, expr, when
 
+logger = logging.getLogger("logger")
+
 
 # spark入口
 def create_env():
@@ -70,14 +72,14 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
 
     # 插入数据
     df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
-    logging.info("数据已写入表: %s", target_table)
+    logger.info("数据已写入表: %s", target_table)
     # 再次记录当前时间用于日志
     end_time = datetime.datetime.now()
     # 记录写入耗时
     duration = end_time - begin_time
     # 转成分秒,整数
     duration = divmod(duration.seconds, 60)
-    logging.info("数据写入耗时: %s 分 %s 秒", duration[0], duration[1])
+    logger.info("数据写入耗时: %s 分 %s 秒", duration[0], duration[1])
 
 
 def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filter_condition=None):
@@ -118,18 +120,24 @@ def log(func):
         func_name = func.__name__
 
         begin_time = datetime.datetime.now()
-        logging.info("函数 %s 开始执行", func_name)
+        logger.info("函数 %s 开始执行", func_name)
         if func_comment:
-            logging.info("函数 %s 它的功能是: %s", func_name, func_comment.strip())
+            logger.info("函数 %s 它的功能是: %s", func_name, func_comment.strip())
         else:
-            logging.info("没有找到%s函数的功能注释。", func_name)
-        result_func = func(*args, **kwargs)
+            logger.warning("没有找到%s函数的功能注释。", func_name)
+
+        try:
+            result_func = func(*args, **kwargs)
+        except Exception as e:
+            logger.error("函数 %s 执行出错: %s", func_name, e)
+            raise e
+
         end_time = datetime.datetime.now()
-        logging.info("函数 %s 执行完成", func_name)
+        logger.info("函数 %s 执行完成", func_name)
         duration = end_time - begin_time
         # 转成分秒,整数
         duration = divmod(duration.seconds, 60)
-        logging.info("函数 %s 执行时间: %s 分 %s 秒", func_name, duration[0], duration[1])
+        logger.info("函数 %s 执行时间: %s 分 %s 秒", func_name, duration[0], duration[1])
 
         return result_func
 
