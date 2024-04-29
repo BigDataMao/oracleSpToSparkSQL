@@ -130,7 +130,7 @@ def log(func):
             result_func = func(*args, **kwargs)
         except Exception as e:
             logger.error("函数 %s 执行出错: %s", func_name, e)
-            raise e
+            raise
 
         end_time = datetime.datetime.now()
         logger.info("函数 %s 执行完成", func_name)
