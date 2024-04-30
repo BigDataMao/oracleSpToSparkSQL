@@ -64,8 +64,10 @@ def oracle_ddl_to_hive(oracle_ddl):
     left_index, right_index = find_matching_parentheses(oracle_ddl)
     # 获取字段信息字符串
     str_ddl = oracle_ddl[left_index + 1:right_index]
+    # 删除CONSTRAINT约束及后面的内容
+    str_ddl = re.sub(r",\s*CONSTRAINT.*", '', str_ddl)
     # 切割一行一行的字段信息
-    row_ddl = [s.strip() for s in str_ddl.split(",")]
+    row_ddl = [s.strip() for s in str_ddl.split(", ")]  # 注意这里的空格不能去掉,否则类似"NUMBER(10,2)"会被切割成"NUMBER(10"和"2)"
     # 去除多余的空格
     row_ddl = [re.sub(r"\s+", " ", s) for s in row_ddl]
     # 每行字段信息切割
@@ -99,12 +101,12 @@ if __name__ == '__main__':
     oracle_ddl_str = """
     create table CF_BUSIMG.T_COCKPIT_BUSI_ANAL_TAR_RESP_Q
     (
-        "busi_year"           VARCHAR2(4),
-        busi_quarter        VARCHAR2(2),
-        respons_line_id     VARCHAR2(20),
-        busi_type           VARCHAR2(10),
-        busi_type_name      VARCHAR2(100),
-        complete_value      NUMBER default 0,
+        "busi_year"           VARCHAR2(4), 
+        busi_quarter        VARCHAR2(2), 
+        respons_line_id     VARCHAR2(20), 
+        busi_type           VARCHAR2(10), 
+        busi_type_name      VARCHAR2(100), 
+        complete_value      NUMBER default 0, 
         complete_value_rate NUMBER default 0
     )
     tablespace TS_CF_BUSIMG
