@@ -103,7 +103,7 @@ def generate_hive_ddl(table_info: dict, type_mapping: Tuple[str,str]):
     生成hive的ddl语句
     :param table_info: 字典,至少包含hive_table_fullname,partition_col,is_partition三个键值对
     :param type_mapping: 二维数组,包含字段名和字段类型
-    :return hive_ddl: hive的ddl语句,可以供直接执行
+    :return: hive_ddl: hive的ddl语句,可以供直接执行
     """
     # 获取type_mapping中第一个元素(字段名)的长度最大值
     max_len = max([len(x[0]) for x in type_mapping])
@@ -114,7 +114,7 @@ def generate_hive_ddl(table_info: dict, type_mapping: Tuple[str,str]):
     if table_info.get('is_partition'):
         partition_ddl = "PARTITIONED BY (\n"
         for name in partition_col_list:
-            partition_ddl += name.ljust(adjust_len) + " STRING, \n"
+            partition_ddl += "\t" + name.upper().ljust(adjust_len) + " STRING, \n"
         partition_ddl = partition_ddl[:-3] + ")"
     else:
         partition_ddl = ""
@@ -123,12 +123,12 @@ def generate_hive_ddl(table_info: dict, type_mapping: Tuple[str,str]):
     for name, name_type in type_mapping:
         if name.lower() not in partition_col_list:
             if tmp_ddl == "":
-                tmp_ddl = name.ljust(adjust_len) + "\t" + name_type
+                tmp_ddl = "\t" + name.ljust(adjust_len) + "\t" + name_type
             else:
-                tmp_ddl = tmp_ddl + ",\n" + name.ljust(adjust_len) + "\t" + name_type
+                tmp_ddl = tmp_ddl + ",\n" + "\t" + name.ljust(adjust_len) + "\t" + name_type
 
     hive_ddl = \
-        f"""create table {table_info.get('hive_table_fullname')}(\n{tmp_ddl})\n{partition_ddl};
+        f"""CREATE TABLE IF NOT EXISTS {table_info.get('hive_table_fullname')}(\n{tmp_ddl})\n{partition_ddl};
         """
     return hive_ddl
 
