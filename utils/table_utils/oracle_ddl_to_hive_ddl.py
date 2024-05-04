@@ -5,6 +5,7 @@
 """
 
 import re
+from typing import List, Tuple
 
 """
 数据类型映射关系如下：
@@ -97,30 +98,39 @@ def oracle_ddl_to_hive(oracle_ddl):
     return pure_ddl
 
 
-if __name__ == '__main__':
-    oracle_ddl_str = """
-    create table CF_BUSIMG.T_COCKPIT_BUSI_ANAL_TAR_RESP_Q
-    (
-        "busi_year"           VARCHAR2(4), 
-        busi_quarter        VARCHAR2(2), 
-        respons_line_id     VARCHAR2(20), 
-        busi_type           VARCHAR2(10), 
-        busi_type_name      VARCHAR2(100), 
-        complete_value      NUMBER default 0, 
-        complete_value_rate NUMBER default 0
-    )
-    tablespace TS_CF_BUSIMG
-        pctfree 10
-        initrans 1
-        maxtrans 255
-        storage
-        (
-            initial 64K
-            next 1M
-            minextents 1
-            maxextents unlimited
-        );
+def generate_hive_ddl(table_info: dict, type_mapping: Tuple[str,str]):
     """
+    生成hive的ddl语句
+    :param table_info: 字典,至少包含hive_table_fullname,partition_col,is_partition三个键值对
+    :param type_mapping: 二维数组,包含字段名和字段类型
+    :return hive_ddl: hive的ddl语句,可以供直接执行
+    """
+    # 获取type_mapping中第一个元素(字段名)的长度最大值
+    max_len = max([len(x[0]) for x in type_mapping])
+    adjust_len = max_len + 4
+    # 获取分区字段列表
+    partition_col_list = table_info.get('partition_col')
+    # 生成分区后缀类似于: PARTITIONED BY (dt STRING, country STRING)
+    if table_info.get('is_partition'):
+        partition_ddl = "PARTITIONED BY (\n"
+        for name in partition_col_list:
+            partition_ddl += name.ljust(adjust_len) + " STRING, \n"
+        partition_ddl = partition_ddl[:-3] + ")"
+    else:
+        partition_ddl = ""
+    # 生成字段信息
+    tmp_ddl = ""
+    for name, name_type in type_mapping:
+        if name.lower() not in partition_col_list:
+            if tmp_ddl == "":
+                tmp_ddl = name.ljust(adjust_len) + "\t" + name_type
+            else:
+                tmp_ddl = tmp_ddl + ",\n" + name.ljust(adjust_len) + "\t" + name_type
 
-    arr_1 = oracle_ddl_to_hive(oracle_ddl=oracle_ddl_str)
-    print(arr_1)
+    hive_ddl = \
+        f"""create table {table_info.get('hive_table_fullname')}(\n{tmp_ddl})\n{partition_ddl};
+        """
+    return hive_ddl
+
+
+
