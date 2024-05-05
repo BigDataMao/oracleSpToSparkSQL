@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
-"""
-业务人员营业部维护
-"""
 import logging
 
 from pyspark.sql.functions import col
 
-from utils.task_env import return_to_hive
+from utils.task_env import return_to_hive, log
 
 
+@log
 def p_cockpit_00110_1_data(spark, busi_date):
+    """
+    业务人员营业部维护
+    """
     df_ds_crm_broker = spark.table("ods.t_ds_crm_broker")
     df_cockpit_00110 = spark.table("ddw.t_cockpit_00110")
 
@@ -33,4 +34,4 @@ def p_cockpit_00110_1_data(spark, busi_date):
         insert_mode="overwrite"
     )
 
-    logging.info("ddw.t_cockpit_00119写入完成")
+    logging.info("ddw.t_cockpit_00110写入完成")

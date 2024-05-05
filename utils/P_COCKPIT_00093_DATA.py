@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
-"""
-宏源-千万工程“开户时间区间落地数据
-"""
 import logging
 
 from pyspark.sql.functions import col, lit, count, when, regexp_replace, coalesce, length, substring, sum, round
 
-from utils.task_env import return_to_hive
+from utils.task_env import return_to_hive, log
 
 
+@log
 def p_cockpit_00093_data(spark, busi_date):
+    """
+    宏源-千万工程“开户时间区间落地数据
+    """
     # 日期处理
     v_busi_year = busi_date[:4]
     v_begin_date = v_busi_year + '0101'

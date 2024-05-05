@@ -5,9 +5,10 @@
 from pyspark.sql import Window
 from pyspark.sql.functions import col, min, max, count, sum, row_number, desc, when, lit, coalesce
 
-from utils.task_env import return_to_hive
+from utils.task_env import return_to_hive, log
 
 
+@log
 def p_cockpit_00110_before(spark, busi_month):
 
     if busi_month.length() == 6:
@@ -183,7 +184,7 @@ def p_cockpit_00110_before(spark, busi_month):
         "t.oa_broker_name",
         "t.sales_product_avg_rights",
         "t.advisor_avg_rights",
-        col("t.SALES_PRODUCT_AVG_RIGHTS") + col("t.ADVISOR_AVG_RIGHTS").alias("SUM_AVG_RIGHTS"),
+        (col("t.SALES_PRODUCT_AVG_RIGHTS") + col("t.ADVISOR_AVG_RIGHTS")).alias("SUM_AVG_RIGHTS"),
         "t.sales_share",
         "t.ADVISOR_NAME",
         "t.fof_avg_rights"
