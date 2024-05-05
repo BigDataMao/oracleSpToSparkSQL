@@ -16,3 +16,6 @@ class Config:
 
     def get(self, key):
         return self.data.get(key)
+
+    def get_logger(self):
+        return self.data.get('logger')
