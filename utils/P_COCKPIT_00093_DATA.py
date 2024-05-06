@@ -207,7 +207,7 @@ def p_cockpit_00093_data(spark, busi_date):
     return_to_hive(
         spark=spark,
         df_result=df_y,
-        target_table="ddw.t_cockpit_00093",
+        target_table="ddw.t_brp_00093",
         insert_mode="overwrite",
         partition_column=["busi_year"],
         partition_value=[v_busi_year]
