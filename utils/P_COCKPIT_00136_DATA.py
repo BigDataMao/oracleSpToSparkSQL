@@ -6,16 +6,14 @@ import logging
 
 from pyspark.sql.functions import col, lit
 
-from utils.task_env import return_to_hive, update_dataframe
+from utils.task_env import return_to_hive, update_dataframe, log
 
 
+@log
 def p_cockpit_00136_data(spark, busi_date):
     """
-    TODO:
-    本方法其实就是oracle里面的merge into的功能
-    理应有一个主表，一个副表，主表是要更新的表，副表是用来更新主表的表
-    本方法的主要功能是将副表的数据更新到主表中
-    应该有更加简洁的方法来实现这个功能
+    经营目标责任书-数据生成
+    TODO 逻辑待优化
     """
     # 获取年份
     i_year_id = busi_date[:4]
@@ -57,8 +55,6 @@ def p_cockpit_00136_data(spark, busi_date):
         insert_mode="append",
     )
 
-    logging.info("ddw.T_COCKPIT_00136[增量数据],写入完成")
-
     df_y = spark.table("ddw.T_COCKPIT_00135").alias("t") \
         .filter(
         col("t.year_id") == lit(i_year_id),
@@ -85,5 +81,3 @@ def p_cockpit_00136_data(spark, busi_date):
         target_table="ddw.T_COCKPIT_00136",
         insert_mode="overwrite",
     )
-
-    logging.info("ddw.T_COCKPIT_00136[全量数据],更新完成")

@@ -6,9 +6,10 @@ import logging
 
 from pyspark.sql.functions import col, lit
 
-from utils.task_env import return_to_hive
+from utils.task_env import return_to_hive, log
 
 
+@log
 def p_cockpit_00119_data(spark, busi_date):
     df_cockpit_00118 = spark.table("ddw.t_cockpit_00118")
     df_cockpit_00117 = spark.table("ddw.t_cockpit_00117")
@@ -49,4 +50,3 @@ def p_cockpit_00119_data(spark, busi_date):
         insert_mode="overwrite"
     )
 
-    logging.info("ddw.t_cockpit_00119写入完成")

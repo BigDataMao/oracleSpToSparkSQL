@@ -6,11 +6,11 @@ import logging
 
 from pyspark.sql.functions import col, lit, max, count, sum, when, round
 
-from utils.task_env import return_to_hive, update_dataframe
+from utils.task_env import return_to_hive, update_dataframe, log
 
 
+@log
 def p_cockpit_00118_data(spark, busi_date):
-    logging.basicConfig(level=logging.INFO)
     i_month_id = busi_date[:6]
     v_busi_year = busi_date[:4]
 
@@ -26,15 +26,6 @@ def p_cockpit_00118_data(spark, busi_date):
     first_row_trade = df_date_trade.first()
     v_trade_days = first_row_trade["v_trade_days"]
     v_end_date = first_row_trade["v_end_date"]
-
-    logging.info(
-        u"""
-        v_trade_days: %s
-        v_end_date:   %s
-        参数处理完毕
-        """,
-        v_trade_days, v_end_date
-    )
 
     # 2024-04-01
     # v_busi_date = v_busi_year + "-" + busi_date[4:8] + "-" + "01"
@@ -69,8 +60,8 @@ def p_cockpit_00118_data(spark, busi_date):
     # )
 
     # 读取数据表 ods.ctp63_T_DS_ADM_INVESTOR_VALUE 和 ods.ctp63_T_DS_DC_INVESTOR
-    df_a = spark.table("ods.ctp63_T_DS_ADM_INVESTOR_VALUE")
-    df_b = spark.table("ods.ctp63_T_DS_DC_INVESTOR")
+    df_a = spark.table("ods.T_DS_ADM_INVESTOR_VALUE")
+    df_b = spark.table("ods.T_DS_DC_INVESTOR")
 
     # 转换并计算字段
     t_cockpit_00118_jzgx = df_a.join(df_b, col("df_a.investor_id") == col("df_b.investor_id")) \
@@ -101,7 +92,6 @@ def p_cockpit_00118_data(spark, busi_date):
         insert_mode="overwrite"
     )
 
-    # TODO CF_BUSIMG.T_COCKPIT_00118按busi_month分区
     # 读取ddw.T_COCKPIT_00095表的数据
     df_95 = spark.table("ddw.T_COCKPIT_00095")
 

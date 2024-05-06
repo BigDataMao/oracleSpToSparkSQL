@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
-"""
-经营目标考核情况-数据落地
-"""
-import logging
-
-from pyspark.sql.functions import col, lit, count, sum, when, regexp_replace, coalesce
-
-from utils.task_env import return_to_hive, update_dataframe
 
 from datetime import datetime
 
+from pyspark.sql.functions import col, lit, count, sum, when, regexp_replace, coalesce
+
 from utils.date_utils import get_date_period_and_days
+from utils.task_env import return_to_hive, update_dataframe, log
 
 
+@log
 def p_cockpit_00138_data(spark, busi_date):
+    """
+    经营目标考核情况-数据落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式：yyyymmdd
+    :return: None
+    """
     # 获取年份
     # global v_end_month, v_begin_month
     v_last_quarter_id_1, v_last_quarter_id_2, v_last_quarter_id_3 = None, None, None
@@ -712,8 +714,7 @@ def p_cockpit_00138_data(spark, busi_date):
         .filter(
         col("t.open_date").between(lit(v_begin_date), lit(v_end_date))
     ).join(
-        other=df_00138_1.alias("a") \
-            .filter(
+        other=df_00138_1.alias("a").filter(
             col("a.broker_rela_type") == "居间关系"
         ),
         on=(
@@ -1457,5 +1458,3 @@ def p_cockpit_00138_data(spark, busi_date):
         partition_column=["year_id", "quarter_id"],
         partition_value=[v_year_id, v_quarter_id]
     )
-
-    logging.info("ddw.T_COCKPIT_00138写入完成")

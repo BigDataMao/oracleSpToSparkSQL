@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
-"""
-年度任务目标填报表-校验
-"""
 import logging
 
 from pyspark.sql.functions import col, lit, min, max, count, sum, coalesce, when, trim, regexp_replace
 
-from utils.task_env import return_to_hive, update_dataframe
+from utils.task_env import return_to_hive, update_dataframe, log
 from utils.date_utils import get_date_period_and_days
 
 
+@log
 def p_cockpit_00135_data(spark, busi_date):
+    """
+    年度任务目标填报表-校验
+    """
     i_year_id = busi_date[:4]
     v_last_year_begin_month = str(int(i_year_id) - 1) + '01'
     v_last_year_end_month = str(int(i_year_id) - 1) + '12'
@@ -119,7 +120,7 @@ def p_cockpit_00135_data(spark, busi_date):
 
     # TODO: CF_STAT.T_CLIENT_SETT_DATA需要采集
 
-    df_y = spark.table("ods.cf_stat_t_client_sett_data").alias("t") \
+    df_y = spark.table("ddw.t_client_sett_data").alias("t") \
         .filter(
         col("t.busi_date_during").between(v_last_year_begin_month, v_last_year_end_month)
     ).join(
@@ -172,7 +173,7 @@ def p_cockpit_00135_data(spark, busi_date):
         "index_value_now"
     )
 
-    tmp1 = spark.table("ods.CF_STAT_T_CLIENT_SETT_DATA").alias("t") \
+    tmp1 = spark.table("ddw.T_CLIENT_SETT_DATA").alias("t") \
         .filter(
         (col("t.busi_date_during").between(v_last_year_begin_month, v_last_year_end_month))
     ).join(
@@ -252,7 +253,7 @@ def p_cockpit_00135_data(spark, busi_date):
     成交额 绝对指标  客户交易成交金额（双边） 分支机构是双边计算的，直接取CTP的数据，成交额（调整后数据）
     """
 
-    df_y = spark.table("ods.CF_STAT_T_TRADE_SUM_DATA").alias("t") \
+    df_y = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         (col("t.busi_date_during").between(v_last_year_begin_month, v_last_year_end_month))
     ).join(
@@ -286,7 +287,7 @@ def p_cockpit_00135_data(spark, busi_date):
     成交额 相对指标  成交额市占率(双边） 分支机构是双边计算的，直接取CTP的数据，成交额（调整后数据）/行业
     """
 
-    tmp = spark.table("ods.CF_STAT_T_TRADE_SUM_DATA").alias("t") \
+    tmp = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         (col("t.etl_month").between(v_last_year_begin_month, v_last_year_end_month))
     ).join(
@@ -339,7 +340,7 @@ def p_cockpit_00135_data(spark, busi_date):
     成交量 绝对指标  客户交易成交量（双边） 分支机构是双边计算的，直接取CTP的数据，成交量（调整后数据）
     """
 
-    df_y = spark.table("ods.CF_STAT_T_TRADE_SUM_DATA").alias("t") \
+    df_y = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         (col("t.busi_date_during").between(v_last_year_begin_month, v_last_year_end_month))
     ).join(
@@ -373,7 +374,7 @@ def p_cockpit_00135_data(spark, busi_date):
     成交量 相对指标  成交量市占率(双边） 分支机构是双边计算的，直接取CTP的数据，成交量（调整后数据）/行业
     """
 
-    tmp = spark.table("ods.CF_STAT_T_TRADE_SUM_DATA").alias("t") \
+    tmp = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         (col("t.etl_month").between(v_last_year_begin_month, v_last_year_end_month))
     ).join(
@@ -436,21 +437,21 @@ def p_cockpit_00135_data(spark, busi_date):
         在所选择的月份区间，有交易的客户数量
     """
 
-    tmp = spark.table("ods.CTP63_T_DS_CRM_BROKER_INVESTOR_RELA").alias("a") \
+    tmp = spark.table("ods.T_DS_CRM_BROKER_INVESTOR_RELA").alias("a") \
         .filter(
         (col("a.RELA_STS") == lit("A")) &
         (col("a.APPROVE_STS") == lit("0")) &
         (col("a.data_pct").isNotNull())
     ).join(
-        other=spark.table("ods.CTP63_T_DS_CRM_BROKER").alias("b"),
+        other=spark.table("ods.T_DS_CRM_BROKER").alias("b"),
         on=(col("a.broker_id") == col("b.broker_id")),
         how="inner"
     ).join(
-        other=spark.table("ods.CTP63_T_DS_MDP_DEPT00").alias("f"),
+        other=spark.table("ods.T_DS_MDP_DEPT00").alias("f"),
         on=(col("b.department_id") == col("f.chdeptcode")),
         how="inner"
     ).join(
-        other=spark.table("ods.CTP63_T_DS_DC_INVESTOR").alias("c"),
+        other=spark.table("ods.T_DS_DC_INVESTOR").alias("c"),
         on=(col("a.investor_id") == col("c.investor_id")),
         how="inner"
     ).join(
@@ -532,7 +533,7 @@ def p_cockpit_00135_data(spark, busi_date):
         "t.fund_account_id"
     )
 
-    tmp_1 = spark.table("ods.CF_STAT_T_TRADE_SUM_DATA").alias("t") \
+    tmp_1 = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         col("t.busi_date_during").between(v_last_year_begin_month, v_last_year_end_month),
         col("t.TOTAL_TRANSFEE") != lit(0)
@@ -599,7 +600,7 @@ def p_cockpit_00135_data(spark, busi_date):
         "t.fund_account_id"
     )
 
-    tmp_1 = spark.table("ods.CF_STAT_T_TRADE_SUM_DATA").alias("t") \
+    tmp_1 = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         col("t.busi_date_during").between(v_last_year_begin_month, v_last_year_end_month),
         col("t.TOTAL_TRANSFEE") != lit(0)
@@ -809,5 +810,3 @@ def p_cockpit_00135_data(spark, busi_date):
         partition_column="year_id",
         partition_value=i_year_id
     )
-
-    logging.info("P_COCKPIT_00135_DATA,数据处理完成")

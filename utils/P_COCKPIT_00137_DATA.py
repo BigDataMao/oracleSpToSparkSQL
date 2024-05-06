@@ -8,10 +8,14 @@ import logging
 from pyspark.sql.functions import col, lit, sum, when, coalesce, trim, regexp_replace, expr
 
 from utils.date_utils import get_date_period_and_days
-from utils.task_env import return_to_hive, update_dataframe
+from utils.task_env import return_to_hive, update_dataframe, log
 
 
+@log
 def p_cockpit_00137_data(spark, busi_date):
+    """
+    经营目标完成情况-数据落地
+    """
     i_month_id = busi_date[:6]
     v_year_id = busi_date[:4]
     (
@@ -25,7 +29,6 @@ def p_cockpit_00137_data(spark, busi_date):
         v_end_date,
     ) = get_date_period_and_days(spark, busi_month=i_month_id, is_trade_day=False)
 
-    # TODO: 分区表 ddw.t_cockpit_00137 分区字段 year_id, busi_month
 
     """
     初始化数据:年度目标维护表
@@ -768,5 +771,3 @@ def p_cockpit_00137_data(spark, busi_date):
         partition_column=["year_id", "busi_month"],
         partition_value=[v_year_id, i_month_id]
     )
-
-    logging.info("ddw.T_COCKPIT_00137[增量数据],写入完成")

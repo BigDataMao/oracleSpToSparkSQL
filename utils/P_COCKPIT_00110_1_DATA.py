@@ -33,5 +33,3 @@ def p_cockpit_00110_1_data(spark, busi_date):
         target_table="ddw.t_cockpit_00110",
         insert_mode="overwrite"
     )
-
-    logging.info("ddw.t_cockpit_00110写入完成")

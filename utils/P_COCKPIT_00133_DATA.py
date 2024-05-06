@@ -8,12 +8,11 @@ from datetime import datetime, timedelta
 from pyspark.sql.functions import col, lit, min, max, count, sum, coalesce, when, trim, regexp_replace
 
 from utils.P_COCKPIT_00110_BEFORE import p_cockpit_00110_before
-from utils.task_env import return_to_hive, update_dataframe
+from utils.task_env import return_to_hive, update_dataframe, log
 
 
+@log
 def p_cockpit_00133_data(spark, busi_date):
-    logging.basicConfig(level=logging.INFO)
-
     i_month_id = busi_date[:6]
 
     df_date_trade = spark.table("edw.t10_pub_date") \
@@ -324,17 +323,17 @@ def p_cockpit_00133_data(spark, busi_date):
     根据查询日期获取业务人员关系数据
     """
 
-    df_tmp = spark.table("ods.CTP63_T_DS_CRM_BROKER_INVESTOR_RELA").alias("a") \
+    df_tmp = spark.table("ods.T_DS_CRM_BROKER_INVESTOR_RELA").alias("a") \
         .join(
-        other=spark.table("ods.CTP63_T_DS_CRM_BROKER").alias("b"),
+        other=spark.table("ods.T_DS_CRM_BROKER").alias("b"),
         on=col("a.broker_id") == col("b.broker_id"),
         how="inner"
     ).join(
-        other=spark.table("ods.CTP63_T_DS_MDP_DEPT00").alias("f"),
+        other=spark.table("ods.T_DS_MDP_DEPT00").alias("f"),
         on=col("b.department_id") == col("f.chdeptcode"),
         how="inner"
     ).join(
-        other=spark.table("ods.CTP63_T_DS_DC_INVESTOR").alias("c"),
+        other=spark.table("ods.T_DS_DC_INVESTOR").alias("c"),
         on=col("a.investor_id") == col("c.investor_id"),
         how="inner"
     ).join(
@@ -532,5 +531,3 @@ def p_cockpit_00133_data(spark, busi_date):
         partition_column="busi_month",
         partition_value=i_month_id
     )
-
-    logging.info("ddw.T_COCKPIT_00133写入完成")

@@ -212,5 +212,3 @@ def p_cockpit_00093_data(spark, busi_date):
         partition_column=["busi_year"],
         partition_value=[v_busi_year]
     )
-
-    logging.info("ddw.t_cockpit_00093写入完成")

@@ -9,6 +9,8 @@ from pyspark.sql.functions import sum, round, count
 from utils.date_utils import get_date_period_and_days
 from utils.task_env import *
 
+logger = logging.getLogger("logger")
+
 
 @log
 def p_cockpit_00092_data(spark, busi_date):
@@ -51,7 +53,6 @@ def p_cockpit_00092_data(spark, busi_date):
         }
     }
 
-    # TODO CF_CRMMG.T_HIS_LABEL_CLIENT, cf_crmmg.t_label 需要采集
     for value in dict_data.values():
         df_92_tmp = spark.table("ods.T_CRMMG_HIS_LABEL_CLIENT").alias("t") \
             .filter(
@@ -178,8 +179,6 @@ def p_cockpit_00092_data(spark, busi_date):
     """
     初始化CF_BUSIMG.T_BRP_00092
     """
-
-    # TODO: CF_BUSIMG.T_BRP_00092 分区字段 Busi_Year
 
     df_92_y = spark.table("ddw.T_OA_BRANCH").alias("b") \
         .filter(

@@ -3,11 +3,10 @@ import logging
 
 from pyspark.sql.functions import col, sum, expr, round, when, coalesce, lit
 
-from utils.task_env import return_to_hive
-
-logging.basicConfig(level=logging.INFO)
+from utils.task_env import return_to_hive, log
 
 
+@log
 def p_cockpit_00120_data(spark, busi_date):
     i_busi_month = busi_date[:6]
     # 查询符合条件的数据
@@ -37,8 +36,8 @@ def p_cockpit_00120_data(spark, busi_date):
         v_interest_rate = '1'
 
     # 读取数据表 ods.ctp63_T_DS_ADM_INVESTOR_VALUE 和 ods.ctp63_T_DS_DC_INVESTOR
-    df_a = spark.table("ods.ctp63_T_DS_ADM_INVESTOR_VALUE")
-    df_b = spark.table("ods.ctp63_T_DS_DC_INVESTOR")
+    df_a = spark.table("ods.T_DS_ADM_INVESTOR_VALUE")
+    df_b = spark.table("ods.T_DS_DC_INVESTOR")
 
     # 转换并计算字段
     t_cockpit_00120_jzgx = df_a.join(df_b, df_a.investor_id == df_b.investor_id) \
@@ -138,5 +137,3 @@ def p_cockpit_00120_data(spark, busi_date):
         partition_column="busi_month",
         partition_value=i_busi_month
     )
-
-    logging.info("ddw.T_COCKPIT_00120写入完成")
