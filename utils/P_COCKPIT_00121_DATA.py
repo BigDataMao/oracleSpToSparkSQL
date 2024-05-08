@@ -6,6 +6,12 @@ from utils.task_env import return_to_hive, log
 
 @log
 def p_cockpit_00121_data(spark, busi_date):
+    """
+    收入分配表(最终呈现表) 普通产品 明细数据 数据落地，到月份
+    :param spark:
+    :param busi_date:
+    :return:
+    """
     i_busi_month = busi_date[:6]
     # 读取Hive表数据并创建DataFrame
     df_t = spark.table("ddw.T_COCKPIT_00120")
