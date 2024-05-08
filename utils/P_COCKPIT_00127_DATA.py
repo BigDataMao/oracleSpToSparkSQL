@@ -8,6 +8,12 @@ from utils.task_env import return_to_hive, update_dataframe, log
 
 @log
 def p_cockpit_00127_data(spark, busi_date):
+    """
+    财务内核表-调整前数据落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期, 格式：yyyymmdd
+    :return: None
+    """
 
     logging.info("开始执行p_cockpit_00127_data.py,接收到busi_date: %s", busi_date)
 
@@ -57,7 +63,7 @@ def p_cockpit_00127_data(spark, busi_date):
         b10    投资收益（ 汇兑收益（净损失以“－”号填列）               6061汇兑损益
         b11     其他业务收入                                  6051其他业务收入
     """
-    df_branch = spark.table("edw.H16_HYNC65_INDEX_RESULT_BRANCH")
+    df_branch = spark.table("ddw.T_HYNC65_INDEX_RESULT_BRANCH")
     df_y = df_branch \
         .filter((col("busi_month") == i_month_id) & (col("index_para_name") == "营业收入")) \
         .groupBy("busi_month", "book_id") \
