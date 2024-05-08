@@ -40,7 +40,7 @@ def p_cockpit_00120_data(spark, busi_date):
     df_b = spark.table("ods.T_DS_DC_INVESTOR")
 
     # 转换并计算字段
-    t_cockpit_00120_jzgx = df_a.join(df_b, df_a.investor_id == df_b.investor_id) \
+    t_cockpit_00120_jzgx = df_a.alias("df_a").join(df_b.alias("df_b"), df_a.investor_id == df_b.investor_id) \
         .filter(df_a.date_dt == v_busi_date) \
         .groupBy(df_a.investor_id) \
         .agg(
