@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
-"""
-收入分配表(最终呈现表) foF产品 明细数据 数据落地，到月份
-"""
 import logging
 
 from pyspark.sql.functions import col, lit
 
 from utils.task_env import return_to_hive, log
 
+logger = logging.getLogger('logger')
+
 
 @log
 def p_cockpit_00119_data(spark, busi_date):
+    """
+    收入分配表(最终呈现表) foF产品 明细数据 数据落地，到月份
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期, 格式：yyyymmdd
+    :return: None
+    """
     df_cockpit_00118 = spark.table("ddw.t_cockpit_00118")
     df_cockpit_00117 = spark.table("ddw.t_cockpit_00117")
 
@@ -22,8 +27,8 @@ def p_cockpit_00119_data(spark, busi_date):
     ).join(
         other=df_cockpit_00117.alias("a"),
         on=(
-            col("t.busi_month") == col("a.busi_month"),
-            col("t.filing_code") == col("a.filing_code")
+            (col("t.busi_month") == col("a.busi_month")) &
+            (col("t.filing_code") == col("a.filing_code"))
         ),
         how="inner"
     ).select(
