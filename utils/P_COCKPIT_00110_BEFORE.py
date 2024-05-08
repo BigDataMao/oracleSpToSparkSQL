@@ -10,8 +10,14 @@ from utils.task_env import return_to_hive, log
 
 @log
 def p_cockpit_00110_before(spark, busi_month):
+    """
+    权益分配表-FOF产品（最终呈现表样式）
+    :param spark: SparkSession
+    :param busi_month: 业务月份
+    :return: None
+    """
 
-    if busi_month.length() == 6:
+    if len(busi_month) == 6:
         i_busi_month = busi_month
     else:
         raise Exception("busi_month参数格式错误！")
@@ -34,11 +40,13 @@ def p_cockpit_00110_before(spark, busi_month):
     # 客户证件号码，客户保有份额
     tmp = spark.table("ddw.T_COCKPIT_00096").alias("a") \
         .filter(
-        (col("busi_month").between(v_begin_date, v_end_date))
+        (col("a.busi_date").between(v_begin_date, v_end_date))
+    ).groupBy(
+        "a.filing_code", "a.product_name", "a.client_name", "a.id_no"
     ).agg(
         sum("a.confirm_share").alias("client_confirm_share")
     ).select(
-        "filing_code", "product_name", "client_name", "client_confirm_share"
+        "filing_code", "product_name", "client_name", "id_no", "client_confirm_share"
     )
 
     # 产品总分配份额
@@ -132,8 +140,8 @@ def p_cockpit_00110_before(spark, busi_month):
     ).agg(
         sum(
             when(
-                v_trade_days > 0,
-                col("t.rights") / v_trade_days
+                lit(v_trade_days) > 0,
+                col("t.rights") / lit(v_trade_days)
             ).otherwise(0)
         ).alias("avg_rights")
     ).select(
@@ -162,7 +170,7 @@ def p_cockpit_00110_before(spark, busi_month):
         "t.OA_BRANCH_ID",
         "oa_branch_name",
         "t.OA_BROKER_ID",
-        "oa_broker_name",
+        "t.oa_broker_name",
         (coalesce(col("a.avg_rights"), lit(0))
          * (1 - col("t.OA_BRANCH_ADVISOR_RATE"))
          * coalesce(col("b.oa_broker_name_prop"), lit(0))).alias("sales_product_avg_rights"),  # 销售产品
@@ -179,7 +187,7 @@ def p_cockpit_00110_before(spark, busi_month):
         "t.filing_code",
         "t.product_name",
         "t.OA_BRANCH_ID",
-        "oa_branch_name",
+        "t.oa_branch_name",
         "t.OA_BROKER_ID",
         "t.oa_broker_name",
         "t.sales_product_avg_rights",

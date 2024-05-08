@@ -29,9 +29,9 @@ def p_cockpit_00093_data(spark, busi_date):
     ).join(
         other=df_ds_adm_brokerdata_detail.alias("a2"),
         on=(
-                col("a.date_dt") == col("a2.tx_dt") &
-                col("a.investor_id") == col("a2.investor_id") &
-                col("a2.rec_freq") == lit("M")
+                (col("a.date_dt") == col("a2.tx_dt")) &
+                (col("a.investor_id") == col("a2.investor_id")) &
+                (col("a2.rec_freq") == lit("M"))
         ),
         how="left"
     ).groupBy(
@@ -68,8 +68,8 @@ def p_cockpit_00093_data(spark, busi_date):
         .join(
         other=df_label.alias("a"),
         on=(
-                col("t.label_id") == col("a.label_id") &
-                col("a.label_id") == lit("BQ4909")  # 千万工程
+                (col("t.label_id") == col("a.label_id")) &
+                (col("a.label_id") == lit("BQ4909"))  # 千万工程
         ),
         how="inner"
     ).join(
@@ -94,24 +94,9 @@ def p_cockpit_00093_data(spark, busi_date):
         ),
         how="left"
     ).filter(
-        col("c.oa_branch_id").isNotNull() &
-        col("t.months").between(lit(v_begin_month), lit(v_end_month)) &
-        col("b.client_type") == lit("0")  # 自然人
-    ).groupBy(
-        col("b.fund_account_id"),
-        col("b.open_date"),
-        col("c.oa_branch_id"),
-        col("c.oa_branch_name"),
-        (
-            when(
-                condition=length(col("b.id_no")) == lit(18),
-                value=substring(col("b.id_no"), -12, 8)
-            ).when(
-                condition=length(col("b.id_no")) == lit(15),
-                value=lit("19") + substring(col("b.id_no"), -9, 6)
-            ).otherwise(lit(0))
-        ).alias("birth"),
-        col("d.jgx")
+        (col("c.oa_branch_id").isNotNull()) &
+        (col("t.months").between(lit(v_begin_month), lit(v_end_month))) &
+        (col("b.client_type") == lit("0"))  # 自然人
     ).select(
         col("b.fund_account_id"),
         col("b.open_date"),
@@ -126,8 +111,8 @@ def p_cockpit_00093_data(spark, busi_date):
                 value=lit("19") + substring(col("b.id_no"), -9, 6)
             ).otherwise(lit(0))
         ).alias("birth"),
-        coalesce(col("d.jgx"), lit(0)).alias("jgx")
-    ).alias("df_tmp")
+        col("d.jgx")
+    ).fillna(0).dropDuplicates()
 
     df_tmp1 = df_tmp.alias("t") \
         .groupBy(
@@ -178,8 +163,10 @@ def p_cockpit_00093_data(spark, busi_date):
                 condition=length(col("t.birth")) >= lit("20000101"),
                 value=lit("4")  # 00后
             ).otherwise(lit(""))
-        ).alias("age_range")
-    ).alias("df_tmp1")
+        ).alias("age_range"),
+        col("client_num"),
+        col("jgx_sum")
+    )
 
     df_y = df_tmp1.alias("t") \
         .groupBy(
@@ -201,7 +188,10 @@ def p_cockpit_00093_data(spark, busi_date):
         col("t.oa_branch_id"),
         col("t.oa_branch_name"),
         col("t.open_date_flag"),
-        col("t.t.age_range")
+        col("t.age_range"),
+        col("client_num"),
+        col("jgx_sum"),
+        col("avg_jgx")
     )
 
     return_to_hive(

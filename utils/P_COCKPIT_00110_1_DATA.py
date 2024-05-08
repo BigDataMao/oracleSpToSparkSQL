@@ -16,7 +16,7 @@ def p_cockpit_00110_1_data(spark, busi_date):
 
     df_y = df_ds_crm_broker.alias("t") \
         .filter(
-        col("t.broker_id").like("ZD")  # 驻点人员
+        col("t.broker_id").like("ZD%")  # 驻点人员
     ).join(
         other=df_cockpit_00110.alias("a"),
         on=(
