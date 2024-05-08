@@ -13,6 +13,9 @@ from utils.task_env import return_to_hive, log
 def p_cockpit_00128_data(spark, busi_date):
     """
     投资者保障基金调整表-初始化数据生成
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期, 格式：yyyymmdd
+    :return: None
     """
     v_busi_month = busi_date[:6]
     df_128_m = spark.table("ddw.T_COCKPIT_00128").filter(col("busi_month") == lit(v_busi_month))
