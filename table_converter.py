@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
 import os
 from os import path
+
+from pyhive import hive
 
 from utils.io_utils.clean_table_info import clean_table_info
 from utils.io_utils.csv_utils import csv_to_dict_list
@@ -21,14 +24,34 @@ table_info = clean_table_info(data)
 # 获取oracle_ddl
 table_info_clean = get_oracle_ddl(table_info)
 
-i = 1
-for item in table_info_clean:
-    # 获取字段名和字段类型
-    tuple2 = oracle_ddl_to_hive(item.get('oracle_ddl'))
-    # 生成hive的ddl语句
-    hive_ddl = generate_hive_ddl(item, tuple2)
+# i = 1
+# for item in table_info_clean:
+#     # 获取字段名和字段类型
+#     tuple2 = oracle_ddl_to_hive(item.get('oracle_ddl'))
+#     # 生成hive的ddl语句
+#     hive_ddl = generate_hive_ddl(item, tuple2)
+#
+#     print('\n\n' + str(i) + '\n\n')
+#     print(hive_ddl)
+#
+#     i += 1
 
-    print('\n\n' + str(i) + '\n\n')
+
+conn = hive.Connection(
+    host='cdh-master',
+    port=10000,
+    username='root'
+)
+for item in table_info_clean:
+    tuple2 = oracle_ddl_to_hive(item.get('oracle_ddl'))
+    hive_ddl = generate_hive_ddl(item, tuple2)
     print(hive_ddl)
 
-    i += 1
+    curser = conn.cursor()
+    query = hive_ddl
+    curser.execute(query)
+    logging.info("Table %s created successfully" % item.get('hive_table_fullname'))
+
+    curser.close()
+
+conn.close()

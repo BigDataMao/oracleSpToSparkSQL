@@ -67,6 +67,8 @@ def oracle_ddl_to_hive(oracle_ddl):
     str_ddl = oracle_ddl[left_index + 1:right_index]
     # 删除CONSTRAINT约束及后面的内容
     str_ddl = re.sub(r",\s*CONSTRAINT.*", '', str_ddl)
+    # 删除PRIMARY KEY约束及后面的内容
+    str_ddl = re.sub(r",\s*PRIMARY.*", '', str_ddl)
     # 切割一行一行的字段信息
     row_ddl = [s.strip() for s in str_ddl.split(", ")]  # 注意这里的空格不能去掉,否则类似"NUMBER(10,2)"会被切割成"NUMBER(10"和"2)"
     # 去除多余的空格
@@ -128,7 +130,7 @@ def generate_hive_ddl(table_info: dict, type_mapping: Tuple[str,str]):
                 tmp_ddl = tmp_ddl + ",\n" + "\t" + name.ljust(adjust_len) + "\t" + name_type
 
     hive_ddl = \
-        f"""CREATE TABLE IF NOT EXISTS {table_info.get('hive_table_fullname')}(\n{tmp_ddl})\n{partition_ddl};
+        f"""CREATE TABLE IF NOT EXISTS {table_info.get('hive_table_fullname')}(\n{tmp_ddl})\n{partition_ddl}
         """
     return hive_ddl
 
