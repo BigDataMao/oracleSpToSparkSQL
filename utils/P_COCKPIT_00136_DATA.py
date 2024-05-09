@@ -8,6 +8,8 @@ from pyspark.sql.functions import col, lit
 
 from utils.task_env import return_to_hive, update_dataframe, log
 
+logger = logging.getLogger("logger")
+
 
 @log
 def p_cockpit_00136_data(spark, busi_date):
@@ -20,15 +22,15 @@ def p_cockpit_00136_data(spark, busi_date):
 
     df_136_y = spark.table("ddw.T_COCKPIT_00135").alias("t") \
         .filter(
-        col("t.year_id") == lit(i_year_id),
-        col("t.check_result") == lit("1"),  # 校验结果(0：异常，1：正常)
-        col("t.index_status") == lit("1"),  # 状态(0:待审核，1：审核通过，2：审核未通过)
+        (col("t.year_id") == lit(i_year_id)) &
+        (col("t.check_result") == lit("1")) &
+        (col("t.index_status") == lit("1"))
     ).join(
         other=spark.table("ddw.T_COCKPIT_00136").alias("a"),
         on=(
-            col("t.year_id") == col("a.year_id") &
-            col("t.oa_branch_id") == col("a.oa_branch_id") &
-            col("t.index_id") == col("a.index_id")
+            (col("t.year_id") == col("a.year_id")) &
+            (col("t.oa_branch_id") == col("a.oa_branch_id")) &
+            (col("t.index_id") == col("a.index_id"))
         ),
         how="left_anti"
     ).select(
@@ -57,9 +59,9 @@ def p_cockpit_00136_data(spark, busi_date):
 
     df_y = spark.table("ddw.T_COCKPIT_00135").alias("t") \
         .filter(
-        col("t.year_id") == lit(i_year_id),
-        col("t.check_result") == lit("1"),  # 校验结果(0：异常，1：正常)
-        col("t.index_status") == lit("1"),  # 状态(0:待审核，1：审核通过，2：审核未通过)
+        (col("t.year_id") == lit(i_year_id)) &
+        (col("t.check_result") == lit("1")) &
+        (col("t.index_status") == lit("1"))
     )
 
     df_136 = update_dataframe(
