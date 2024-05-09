@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-经纪业务收入、权益情况-数据落地
-"""
 import logging
 from datetime import datetime, timedelta
 
@@ -13,6 +10,12 @@ from utils.task_env import return_to_hive, update_dataframe, log
 
 @log
 def p_cockpit_00133_data(spark, busi_date):
+    """
+    经纪业务收入、权益情况-数据落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期, 格式：yyyymmdd
+    :return: None
+    """
     i_month_id = busi_date[:6]
 
     df_date_trade = spark.table("edw.t10_pub_date") \
@@ -80,8 +83,8 @@ def p_cockpit_00133_data(spark, busi_date):
     经纪业务收入-利息净收入 CLEAR_INTEREST_INCOME
     """
 
-    df_127 = spark.table("ddw.t_cockpit_00127").alais("df_127")
-    df_b = spark.table("ddw.T_YY_BRANCH_OA_RELA").alais("df_b")
+    df_127 = spark.table("ddw.t_cockpit_00127").alias("df_127")
+    df_b = spark.table("ddw.T_YY_BRANCH_OA_RELA").alias("df_b")
 
     df_y = df_127.join(df_b, col("df_127.book_id") == col("df_b.yy_book_id")) \
         .filter(col("month_id") == i_month_id) \
@@ -90,7 +93,7 @@ def p_cockpit_00133_data(spark, busi_date):
         sum("b6").alias("REMAIN_TRANSFEE_INCOME"),
         sum("b8").alias("MARKET_REDUCE_INCOME"),
         sum("b7").alias("CLEAR_INTEREST_INCOME")
-    ).alais("df_y")
+    ).alias("df_y")
 
     df_113_m = update_dataframe(
         df_to_update=df_113_m,
@@ -107,7 +110,7 @@ def p_cockpit_00133_data(spark, busi_date):
         .withColumn("FUTU_INCOME_new",
                     coalesce(col("REMAIN_TRANSFEE_INCOME"), lit(0)) +
                     coalesce(col("MARKET_REDUCE_INCOME"), lit(0)) +
-                    coalesce(col("CLEAR_INTEREST_INCOME")), lit(0)
+                    coalesce(col("CLEAR_INTEREST_INCOME"), lit(0))
                     ) \
         .drop("FUTU_INCOME") \
         .withColumnRenamed("FUTU_INCOME_new", "FUTU_INCOME")
@@ -239,24 +242,23 @@ def p_cockpit_00133_data(spark, busi_date):
     """
 
     df_96 = spark.table("ddw.t_cockpit_00096") \
-        .filter(col("busi_date").between(v_begin_trade_date, v_end_trade_date)) \
-        .alias("df_96")
+        .filter(col("busi_date").between(v_begin_trade_date, v_end_trade_date))
 
-    df_y = df_96.join(
-        other=df_fund_account,
+    df_y = df_96.alias("a").join(
+        other=df_fund_account.alias("b"),
         on=(
-                (col("df_96.id_no") == col("b.id_no")) &
-                (col("df_96.client_name") == col("b.client_name"))
+                (col("a.id_no") == col("b.id_no")) &
+                (col("a.client_name") == col("b.client_name"))
         ),
         how="inner"
     ).join(
-        other=df_branch_oa,
+        other=df_branch_oa.alias("c"),
         on=col("b.branch_id") == col("c.CTP_BRANCH_ID"),
         how="inner"
     ).groupby(
         "c.oa_branch_id", "c.oa_branch_name"
     ).agg(
-        sum(col("df_96.confirm_share")).alias("PRODUCT_INVENTORY"),
+        sum(col("a.confirm_share")).alias("PRODUCT_INVENTORY"),
         sum(
             when(
                 col("a.wh_trade_type").isin(["0", "1"]),
@@ -290,16 +292,17 @@ def p_cockpit_00133_data(spark, busi_date):
         how="inner"
     ).filter(
         (col("t.confirm_date").between(v_begin_trade_date, v_end_trade_date))
-    ).groupby(
-        "t.confirm_date", "t.fund_account_id", "c.OA_BRANCH_ID"
     ).select(
         col("t.confirm_date").alias("busi_date"), "t.fund_account_id", "c.OA_BRANCH_ID"
-    ).alias("df_tmp")
+    ).dropDuplicates()
 
-    df_133_1 = df_sett_m.alais("t") \
+    df_133_1 = df_sett_m.alias("t") \
         .join(
-        other=df_tmp.alais("a"),
-        on=(col("t.busi_date") == col("a.busi_date")) & (col("t.fund_account_id") == col("a.fund_account_id")),
+        other=df_tmp.alias("a"),
+        on=(
+            (col("t.busi_date") == col("a.busi_date")) &
+            (col("t.fund_account_id") == col("a.fund_account_id"))
+        ),
         how="inner"
     ).filter(
         (col("t.busi_date").between(v_begin_trade_date, v_end_trade_date))
@@ -307,17 +310,17 @@ def p_cockpit_00133_data(spark, busi_date):
         "a.OA_BRANCH_ID"
     ).agg(
         sum(when(col("t.busi_date") == lit(1), col("t.rights")).otherwise(0)).alias("end_rights"),
-        sum(when(v_trade_days > 0, col("t.rights") / v_trade_days).otherwise(0)).alias("avg_rights")
+        sum(when(lit(v_trade_days) > 0, col("t.rights") / v_trade_days).otherwise(0)).alias("avg_rights")
     ).select(
         "a.OA_BRANCH_ID", "end_rights", "avg_rights"
     )
 
-    return_to_hive(
-        spark=spark,
-        df_result=df_133_1,
-        target_table="ddw.tmp_cockpit_00133_1",
-        insert_mode="overwrite"
-    )
+    # return_to_hive(
+    #     spark=spark,
+    #     df_result=df_133_1,
+    #     target_table="ddw.tmp_cockpit_00133_1",
+    #     insert_mode="overwrite"
+    # )
 
     """
     根据查询日期获取业务人员关系数据
@@ -386,12 +389,12 @@ def p_cockpit_00133_data(spark, busi_date):
 
     df_133_2 = df_tmp.filter(col("REAL_BEGIN_DATE") <= col("REAL_END_DATE"))
 
-    return_to_hive(
-        spark=spark,
-        df_result=df_133_2,
-        target_table="ddw.tmp_cockpit_00133_2",
-        insert_mode="overwrite"
-    )
+    # return_to_hive(
+    #     spark=spark,
+    #     df_result=df_133_2,
+    #     target_table="ddw.tmp_cockpit_00133_2",
+    #     insert_mode="overwrite"
+    # )
 
     """
     按照日期计算 期末权益  日均权益
@@ -401,9 +404,7 @@ def p_cockpit_00133_data(spark, busi_date):
         col("FUND_ACCOUNT_ID"),
         col("REAL_BEGIN_DATE"),
         col("REAL_END_DATE")
-    ).groupby(
-        "FUND_ACCOUNT_ID", "REAL_BEGIN_DATE", "REAL_END_DATE"
-    )
+    ).dropDuplicates()
 
     df_133_3 = spark.table("edw.h15_client_sett").alias("t") \
         .filter(col("t.busi_date").between(v_begin_date, v_end_date)) \
@@ -418,26 +419,26 @@ def p_cockpit_00133_data(spark, busi_date):
         "t.fund_account_id"
     ).agg(
         sum(when(col("t.busi_date") == v_end_trade_date, col("t.rights")).otherwise(lit(0))).alias("END_RIGHTS"),
-        sum(when(v_trade_days > 0, col("t.rights") / v_trade_days).otherwise(lit(0))).alias("avg_rights")
+        sum(when(lit(v_trade_days) > 0, col("t.rights") / v_trade_days).otherwise(lit(0))).alias("avg_rights")
     ).select(
         col("t.fund_account_id"),
         col("END_RIGHTS"),
         col("avg_rights")
     )
 
-    return_to_hive(
-        spark=spark,
-        df_result=df_133_3,
-        target_table="ddw.tmp_cockpit_00133_3",
-        insert_mode="overwrite"
-    )
+    # return_to_hive(
+    #     spark=spark,
+    #     df_result=df_133_3,
+    #     target_table="ddw.tmp_cockpit_00133_3",
+    #     insert_mode="overwrite"
+    # )
 
     """
     按照结束日期所在月份获取 “权益分配表——FOF产品”涉及到IB业务部客户的字段“分配日均权益合计” 如果本月没有数据，取上月数据
     CF_BUSIMG.TMP_COCKPIT_00110_7
     """
 
-    p_cockpit_00110_before(spark, busi_date)
+    p_cockpit_00110_before(spark, busi_date[:6])
 
     df_110_7 = spark.table("ddw.TMP_COCKPIT_00110_7")
 
