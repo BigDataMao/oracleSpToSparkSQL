@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-经营目标完成情况-数据落地
-逻辑来源: utils/P_COCKPIT_00137_DATA.sql
-"""
 import logging
 
 from pyspark.sql.functions import col, lit, sum, when, coalesce, trim, regexp_replace, expr
@@ -10,11 +6,16 @@ from pyspark.sql.functions import col, lit, sum, when, coalesce, trim, regexp_re
 from utils.date_utils import get_date_period_and_days
 from utils.task_env import return_to_hive, update_dataframe, log
 
+logger = logging.getLogger("logger")
+
 
 @log
 def p_cockpit_00137_data(spark, busi_date):
     """
     经营目标完成情况-数据落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期, 格式：yyyymmdd
+    :return: None
     """
     i_month_id = busi_date[:6]
     v_year_id = busi_date[:4]
@@ -27,12 +28,13 @@ def p_cockpit_00137_data(spark, busi_date):
     (
         v_begin_date,
         v_end_date,
+        _
     ) = get_date_period_and_days(spark, busi_month=i_month_id, is_trade_day=False)
-
 
     """
     初始化数据:年度目标维护表
     """
+    logger.info("初始化数据:年度目标维护表")
 
     df_137_begin = spark.table("ddw.T_COCKPIT_00135").alias("t") \
         .filter(
@@ -42,9 +44,9 @@ def p_cockpit_00137_data(spark, busi_date):
     ).join(
         other=spark.table("ddw.T_COCKPIT_00137").alias("a"),
         on=(
-                col("t.year_id") == col("a.year_id") &
-                col("t.oa_branch_id") == col("a.oa_branch_id") &
-                col("t.index_id") == col("a.index_id")
+                (col("t.year_id") == col("a.year_id")) &
+                (col("t.oa_branch_id") == col("a.oa_branch_id")) &
+                (col("t.index_id") == col("a.index_id"))
         ),
         how="left_anti"
     ).select(
@@ -68,8 +70,8 @@ def p_cockpit_00137_data(spark, busi_date):
     )
 
     df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
-        col("year_id") == v_year_id,
-        col("busi_month") == i_month_id
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
     )
 
     """
@@ -77,6 +79,7 @@ def p_cockpit_00137_data(spark, busi_date):
     营业收入完成情况（万）  取数源：财务内核表——营业收入，调整后的收入
     来源表 cf_busimg.t_cockpit_00127
     """
+    logger.info("更新数据  分支机构当月值")
 
     df_y = spark.table("ddw.T_COCKPIT_00127").alias("t") \
         .filter(
@@ -96,16 +99,31 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=col("INDEX_ASSES_BENCHMARK") == "1",
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '1' ",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH"]
+    )
+
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
     )
 
     """
     经纪业务手续费收入市占率（万分之）
     经纪业务手续费收入市占率 取数源：财务内核表：手续费及佣金净收入+交易所减免返还/行业手续费收入
     """
+    logger.info("经纪业务手续费收入市占率（万分之）")
 
     tmp = spark.table("ddw.T_COCKPIT_INDUSTRY_MANAGE").alias("t") \
         .filter(
@@ -150,19 +168,31 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("1")) &
-            (col("INDEX_TYPE") == lit("1"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '1' and a.INDEX_TYPE = '1'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH", "INDEX_VALUE_INDUST"]
+    )
+
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
     )
 
     """
     客户资产规模 日均客户保证金完成情况 取数源：交易统计表——日均权益（考核口径），调整后的权益。
     后续修改调整
     """
+    logger.info("客户资产规模 日均客户保证金完成情况")
 
     df_y = spark.table("ddw.T_CLIENT_SETT_DATA").alias("t") \
         .filter(
@@ -173,14 +203,14 @@ def p_cockpit_00137_data(spark, busi_date):
         how="left"
     ).join(
         other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
-        on=(col("b.ctp_branch_id") == col("c.ctp_branch_id")),
+        on=(col("b.branch_id") == col("c.ctp_branch_id")),
         how="inner"
     ).groupBy(
         col("c.oa_branch_id")
     ).agg(
         sum(
             when(
-                v_trade_days > 0,
+                lit(v_trade_days) > 0,
                 col("t.avg_trade_rights") / v_trade_days
             ).otherwise(
                 lit(0)
@@ -193,18 +223,30 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("2")) &
-            (col("INDEX_TYPE") == lit("0"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '2' and a.INDEX_TYPE = '0'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH"]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
+    )
+
     """
     日均客户保证金市占率  取数源：交易统计表——日均权益（全口径），调整后的权益/行业
     """
+    logger.info("日均客户保证金市占率")
 
     tmp = spark.table("ddw.T_COCKPIT_INDUSTRY_MANAGE").alias("t") \
         .filter(
@@ -213,8 +255,8 @@ def p_cockpit_00137_data(spark, busi_date):
     ).agg(
         sum(
             when(
-                v_trade_days != 0,
-                col("t.avg_trade_rights") / v_trade_days
+                lit(v_trade_days) != 0,
+                col("t.index_value") * 100000000 / v_trade_days
             ).otherwise(lit(0))
         ).alias("INDEX_VALUE_NOW")
     ).select(
@@ -230,14 +272,14 @@ def p_cockpit_00137_data(spark, busi_date):
         how="left"
     ).join(
         other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
-        on=(col("b.ctp_branch_id") == col("c.ctp_branch_id")),
+        on=(col("b.branch_id") == col("c.ctp_branch_id")),
         how="inner"
     ).groupBy(
         col("c.oa_branch_id")
     ).agg(
         sum(
             when(
-                v_trade_days != 0,
+                lit(v_trade_days) != 0,
                 col("t.avg_trade_rights") / v_trade_days
             ).otherwise(
                 lit(0)
@@ -256,25 +298,36 @@ def p_cockpit_00137_data(spark, busi_date):
             col("t.INDEX_VALUE_BRANCH") / col("t1.INDEX_VALUE_NOW")
         ).otherwise(
             lit(0)
-        ).alias("INDEX_VALUE_BRANCH"),
-        col("t.INDEX_VALUE_NOW").alias("INDEX_VALUE_INDUST")
+        ).alias("INDEX_VALUE_BRANCH")
     )
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("2")) &
-            (col("INDEX_TYPE") == lit("1"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '2' and a.INDEX_TYPE = '1'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH"]
+    )
+
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
     )
 
     """
     考核利润 绝对指标 考核利润完成情况（万） 取数源：财务内核表：三、营业利润（亏损以“-”号填列）　
     来源表 cf_busimg.t_cockpit_00127
     """
+    logger.info("考核利润 绝对指标 考核利润完成情况（万）")
 
     df_y = spark.table("ddw.T_COCKPIT_00127").alias("t") \
         .filter(
@@ -294,24 +347,36 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("3")) &
-            (col("INDEX_TYPE") == lit("0"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '3' and a.INDEX_TYPE = '0'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH"]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
+    )
+
     """
     成交额 绝对指标  客户交易成交金额（双边） 分支机构是双边计算的，直接取CTP的数据，成交额（调整后数据）
     """
+    logger.info("成交额 绝对指标  客户交易成交金额（双边）")
 
     tmp = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         (col("t.busi_date_during") == i_month_id)
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(col("t.fund_account_id") == col("b.fund_account_id")),
         how="left"
     ).join(
@@ -345,24 +410,36 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("4")) &
-            (col("INDEX_TYPE") == lit("0"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '4' and a.INDEX_TYPE = '0'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH", "INDEX_VALUE_INDUST"]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
+    )
+
     """
     成交额 相对指标  成交额市占率(双边） 分支机构是双边计算的，直接取CTP的数据，成交额（调整后数据）/行业
     """
+    logger.info("成交额 相对指标  成交额市占率(双边）")
 
     tmp = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         (col("t.busi_date_during") == i_month_id)
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(col("t.fund_account_id") == col("b.fund_account_id")),
         how="left"
     ).join(
@@ -402,24 +479,36 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("4")) &
-            (col("INDEX_TYPE") == lit("1"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '4' and a.INDEX_TYPE = '1'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH"]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
+    )
+
     """
     成交量 绝对指标  客户交易成交量（双边） 分支机构是双边计算的，直接取CTP的数据，成交量（调整后数据）
     """
+    logger.info("成交量 绝对指标  客户交易成交量（双边）")
 
     tmp = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         (col("t.busi_date_during") == i_month_id)
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(col("t.fund_account_id") == col("b.fund_account_id")),
         how="left"
     ).join(
@@ -455,24 +544,36 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("5")) &
-            (col("INDEX_TYPE") == lit("0"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '5' and a.INDEX_TYPE = '0'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH", "INDEX_VALUE_INDUST"]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
+    )
+
     """
     成交量 相对指标  成交量市占率(双边） 分支机构是双边计算的，直接取CTP的数据，成交量（调整后数据）/行业
     """
+    logger.info("成交量 相对指标  成交量市占率(双边）")
 
     tmp = spark.table("ddw.T_TRADE_SUM_DATA").alias("t") \
         .filter(
         (col("t.busi_date_during") == i_month_id)
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(col("t.fund_account_id") == col("b.fund_account_id")),
         how="left"
     ).join(
@@ -512,13 +613,24 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("5")) &
-            (col("INDEX_TYPE") == lit("1"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '5' and a.INDEX_TYPE = '1'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH"]
+    )
+
+    return_to_hive(
+        spark=spark,
+        df_result=df_137_ym,
+        target_table="ddw.T_COCKPIT_00137",
+        insert_mode="overwrite",
+        partition_column=["year_id", "busi_month"],
+        partition_value=[v_year_id, i_month_id]
+    )
+    # 重读数据
+    df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+        (col("year_id") == v_year_id) &
+        (col("busi_month") == i_month_id)
     )
 
     """
@@ -533,6 +645,7 @@ def p_cockpit_00137_data(spark, busi_date):
     （3）剩余客户数量，
         在所选择的月份区间，有交易的客户数量
     """
+    logger.info("新增有效客户数 绝对指标  新增直接开发有效客户数量")
 
     df_tmp = spark.table("ods.T_DS_CRM_BROKER_INVESTOR_RELA").alias("a") \
         .filter(
@@ -633,24 +746,21 @@ def p_cockpit_00137_data(spark, busi_date):
     df_137_1 = df_tmp.alias("t") \
         .filter(
         col("t.REAL_BEGIN_DATE") <= col("t.REAL_END_DATE")
-    ).groupBy(
-        col("t.fund_account_id"),
-        col("t.BROKER_RELA_TYPE")
     ).select(
         col("t.fund_account_id"),
         col("t.BROKER_RELA_TYPE")
-    )
+    ).dropDuplicates()
 
     # 1. 新增直接开发有效客户数量
     # 2. 新增有效客户数量
     # 两者一起处理
     condition = {
         "a": {
-            "relation_type": (col("a.broker_rela_type") == lit("居间关系")),
+            "relation_type": "a.broker_rela_type = '居间关系' ",
             "index_name": "%新增直接开发有效客户数量%",
         },
         "b": {
-            "relation_type": True,
+            "relation_type": " 1 = 1 ",
             "index_name": "%新增有效客户数量%",
         }
     }
@@ -662,7 +772,7 @@ def p_cockpit_00137_data(spark, busi_date):
         ).join(
             df_137_1.alias("a"),
             on=(
-                col("t.fund_account_id") == col("a.fund_account_id") &
+                (col("t.fund_account_id") == col("a.fund_account_id")) &
                 expr(condition[key]["relation_type"])
             ),
             how="left_anti"
@@ -678,11 +788,9 @@ def p_cockpit_00137_data(spark, busi_date):
             tmp.alias("a"),
             on=(col("t.fund_account_id") == col("a.fund_account_id")),
             how="inner"
-        ).groupBy(
-            col("t.fund_account_id")
         ).select(
             col("t.fund_account_id")
-        )
+        ).dropDuplicates()
 
         df_y = tmp1.alias("t") \
             .join(
@@ -704,19 +812,30 @@ def p_cockpit_00137_data(spark, busi_date):
 
         df_137_ym = update_dataframe(
             df_to_update=df_137_ym,
-            filter_condition=(
-                (col("INDEX_ASSES_BENCHMARK") == lit("6")) &
-                (col("INDEX_TYPE") == lit("0")) &
-                (col("INDEX_NAME").like(condition[key]["index_name"]))
-            ),
+            filter_condition="a.INDEX_ASSES_BENCHMARK = '6' and a.INDEX_TYPE = '0' and a.INDEX_NAME like '%s'" % condition[key]["index_name"],
             df_use_me=df_y,
             join_columns=["oa_branch_id"],
             update_columns=["INDEX_VALUE_BRANCH"]
         )
 
+        return_to_hive(
+            spark=spark,
+            df_result=df_137_ym,
+            target_table="ddw.T_COCKPIT_00137",
+            insert_mode="overwrite",
+            partition_column=["year_id", "busi_month"],
+            partition_value=[v_year_id, i_month_id]
+        )
+        # 重读数据
+        df_137_ym = spark.table("ddw.T_COCKPIT_00137").filter(
+            (col("year_id") == v_year_id) &
+            (col("busi_month") == i_month_id)
+        )
+
     """
     产品销售（万） 绝对指标  新增公司统一组织的产品销售额  （资管表3月度销售人员保有奖励分配情况—新增量）
     """
+    logger.info("产品销售（万） 绝对指标  新增公司统一组织的产品销售额")
 
     df_y = spark.table("ddw.T_COCKPIT_00096").alias("a") \
         .filter(
@@ -724,8 +843,8 @@ def p_cockpit_00137_data(spark, busi_date):
     ).join(
         other=spark.table("edw.h12_fund_account").alias("b"),
         on=(
-            col("a.id_no") == col("b.id_no") &
-            col("a.client_name") == col("b.client_name")
+            (col("a.id_no") == col("b.id_no")) &
+            (col("a.client_name") == col("b.client_name"))
         ),
         how="inner"
     ).join(
@@ -750,10 +869,7 @@ def p_cockpit_00137_data(spark, busi_date):
 
     df_137_ym = update_dataframe(
         df_to_update=df_137_ym,
-        filter_condition=(
-            (col("INDEX_ASSES_BENCHMARK") == lit("7")) &
-            (col("INDEX_TYPE") == lit("0"))
-        ),
+        filter_condition="a.INDEX_ASSES_BENCHMARK = '7' and a.INDEX_TYPE = '0'",
         df_use_me=df_y,
         join_columns=["oa_branch_id"],
         update_columns=["INDEX_VALUE_BRANCH"]
