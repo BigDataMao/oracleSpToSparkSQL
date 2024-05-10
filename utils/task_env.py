@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import datetime
 import functools
+import inspect
 import logging
+import sys
+import traceback
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, col, coalesce, expr, when
@@ -18,9 +21,12 @@ def create_env():
         .config("spark.hadoop.hive.metastore.uris", "thrift://cdh-master:9083") \
         .config("spark.hadoop.hive.exec.scratchdir", "/user/hive/tmp") \
         .config("hive.exec.dynamic.partition.mode", "nonstrict") \
+        .config("spark.debug.maxToStringFields", "300") \
+        .config("spark.driver.extraJavaOptions", "-Dfile.encoding=UTF-8") \
+        .config("spark.executor.extraJavaOptions", "-Dfile.encoding=UTF-8") \
         .enableHiveSupport() \
         .getOrCreate()
-    spark.sparkContext.setLogLevel("ERROR")
+    spark.sparkContext.setLogLevel("WARN")
     return spark
 
 
@@ -28,7 +34,7 @@ def log(func):
     """
     装饰器，用于在函数调用前后打印日志
     :param func: 被装饰的函数
-    :return wrapper: 装饰后的函数
+    :return: wrapper: 装饰后的函数
     """
     @functools.wraps(func)  # 这句前面不能有任何空行,否则解释器不会认为这是装饰器?
     def wrapper(*args, **kwargs):
@@ -38,7 +44,7 @@ def log(func):
         begin_time = datetime.datetime.now()
         logger.info("函数 %s 开始执行", func_name)
         if func_comment:
-            logger.info("函数 %s 它的功能是: %s", func_name, func_comment.strip())
+            logger.info("函数 %s 它的功能是: %s", func_name, func_comment.split("\n")[1].strip())
         else:
             logger.warning("没有找到%s函数的功能注释。", func_name)
 
@@ -63,7 +69,14 @@ def log(func):
 @log
 def return_to_hive(spark, df_result, target_table, insert_mode, partition_column=None, partition_value=None):
     """
-    用于将数据返回hive或hive分区表
+    用于将数据返回hive或hive分区表,
+    不需要指定是否分区表,因为会开启动态分区
+    :param spark: SparkSession
+    :param df_result: DataFrame
+    :param target_table: 目标表名
+    :param insert_mode: 插入模式,可选值为"overwrite"和"append",为"overwrite"时,仅仅会覆盖分区数据,不会覆盖全表数据
+    :param partition_column: 可自定义分区列名
+    :param partition_value: 可自定义分区值
     :return: none
     """
     # 判断是否覆盖写
@@ -100,7 +113,10 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
     # 选择与Hive表列名匹配的列
     selected_columns = list(filter(lambda col_check: col_check in hive_table_columns, df_result.columns))
     df_result = df_result.select(selected_columns)
+
+    logger.info("目标表为: %s", target_table)
     # 记录df_result中的总条数
+    logger.info("正在查询df_result中的总条数......")
     logger.info("本次写入总条数: %s", df_result.count())
     # 插入数据
     df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
@@ -108,6 +124,15 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
 
 
 def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filter_condition=None):
+    """
+    用df_use_me中的数据更新df_to_update中的数据
+    :param df_to_update: 被更新的DataFrame,会被alias为"a"
+    :param df_use_me: 用于更新的DataFrame,会被alias为"b"
+    :param join_columns: 用于连接的列,为list
+    :param update_columns: 需要更新的列,为list
+    :param filter_condition: 过滤条件,为str,会被expr()处理, 其中的列名需要加上"a."或"b."
+    :return: DataFrame
+    """
     df_to_update = df_to_update.alias("a")
     df_use_me = df_use_me.alias("b")
     join_condition = " and ".join(["a.{} = b.{}".format(column, column) for column in join_columns])
@@ -119,7 +144,7 @@ def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filt
             new_col_name,
             when(
                 expr(join_condition) &
-                expr(filter_condition),
+                expr(filter_condition) if filter_condition else lit(True),
                 coalesce(df_use_me[column], df_to_update[column])
             ).otherwise(col("a." + column))
         )
@@ -127,7 +152,38 @@ def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filt
         df_result = df_result.withColumnRenamed(new_col_name, column)
 
     # 删除df_result中属于df2的列
-    for column in join_columns:
+    for column in df_use_me.columns:
         df_result = df_result.drop(col("b." + column))
+
+    return df_result
+
+
+def update_dataframe_ai(df_to_update, df_use_me, join_columns, update_columns, filter_condition=None):
+    """
+    用df_use_me中的数据更新df_to_update中的数据 TODO AI给的版本
+    :param df_to_update: 被更新的DataFrame,会被alias为"a"
+    :param df_use_me: 用于更新的DataFrame,会被alias为"b"
+    :param join_columns: 用于连接的列,为list
+    :param update_columns: 需要更新的列,为list
+    :param filter_condition: 过滤条件,为str,会被expr()处理, 其中的列名需要加上"a."或"b."
+    :return: DataFrame
+    """
+    df_to_update = df_to_update.alias("a")
+    df_use_me = df_use_me.alias("b")
+
+    join_condition = " and ".join(["a.%s = b.%s" % (column, column) for column in join_columns])
+    df_result = df_to_update.join(df_use_me, expr(join_condition), "left_outer")
+
+    for column in update_columns:
+        new_col_name = column + "_new"
+        update_expr = coalesce(col("b.%s" % column), col("a.%s" % column))
+        if filter_condition:
+            update_expr = expr("CASE WHEN %s THEN %s ELSE a.%s END" % (filter_condition, update_expr, column))
+        df_result = df_result.withColumn(new_col_name, update_expr).drop(column).withColumnRenamed(new_col_name, column)
+
+    # 删除df_result中属于df_use_me的列
+    df_result = df_result.select(
+        [col("a.%s" % c) for c in df_to_update.columns] +
+        [col("b.%s" % c) for c in df_use_me.columns if c not in join_columns])
 
     return df_result
