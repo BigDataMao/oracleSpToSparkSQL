@@ -1,17 +1,23 @@
 # -*- coding: utf-8 -*-
-"""
-客户分析落地表(客户分析-业务单位-)
-"""
 import logging
 
 from pyspark.sql import Window
 from pyspark.sql.functions import col, lit, sum, rank
 
 from utils.date_utils import get_busi_week_int, get_mon_sun_str
-from utils.task_env import return_to_hive
+from utils.task_env import return_to_hive, log
+
+logger = logging.getLogger("logger")
 
 
+@log
 def p_cockpit_analyse_top_data(spark, busi_date):
+    """
+    客户分析落地表(客户分析-业务单位-)
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式为"YYYYMMDD"
+    :return: None
+    """
     v_busi_year = busi_date[:4]
     v_rank_no = 9
 
@@ -21,6 +27,12 @@ def p_cockpit_analyse_top_data(spark, busi_date):
     v_begin_date, v_end_date = get_mon_sun_str(busi_date)
 
     # TODO: CF_BUSIMG.T_COCKPIT_CLIENT_ANALYSE_TOP做成分区表,并且分区字段为busi_year, busi_week
+    # 删除指定分区的数据
+    spark.sql(
+        "alter table ddw.t_cockpit_client_analyse_top drop if exists partition(busi_year='{}', busi_week='{}')".format(
+            v_busi_year, v_busi_week
+        )
+    )
 
     """
     指标类型(1:入金前9名，2：出金前9名，3：盈利前9名，4：亏损前9名，5：收入贡献前9名，6：成交量前9名，7：成交额前9名)
@@ -40,9 +52,9 @@ def p_cockpit_analyse_top_data(spark, busi_date):
         (col("oa_branch_id").isNotNull())
     )
 
-    logging.info("第1-5个指标开始计算")
+    logger.info("第1-5个指标开始计算")
     tmp = df_sett.alias("t") \
-        .join(df_fund_account.alias("b"), col("t.fund_account") == col("b.fund_account"), "left") \
+        .join(df_fund_account.alias("b"), col("t.fund_account_id") == col("b.fund_account_id"), "left") \
         .join(df_relo.alias("c"), col("b.branch_id") == col("c.ctp_branch_id"), "inner") \
         .groupBy("t.fund_account_id", "b.client_name", "c.oa_branch_id") \
         .agg(
@@ -99,7 +111,7 @@ def p_cockpit_analyse_top_data(spark, busi_date):
             col("t.rank_no_" + num).alias("rank_no"),
             lit(num).alias("index_type")
         ).filter(
-            col("t.rank_no") <= v_rank_no
+            col("rank_no") <= v_rank_no
         )
 
         return_to_hive(
@@ -111,12 +123,12 @@ def p_cockpit_analyse_top_data(spark, busi_date):
             partition_value=[v_busi_year, v_busi_week]
         )
 
-        logging.info("本次任务共7个指标,已完成第{}个指标".format(num))
+        logger.info("本次任务共7个指标,已完成第{}个指标".format(num))
 
     for i in range(1, 6):  # 1-5
         write_to_hive(i)
 
-    logging.info("第6-7个指标开始计算")
+    logger.info("第6-7个指标开始计算")
 
     """
     6：成交量前9名，7：成交额前9名
@@ -124,7 +136,7 @@ def p_cockpit_analyse_top_data(spark, busi_date):
     """
 
     tmp = df_hold_balance.alias("t") \
-        .join(df_fund_account.alias("b"), col("t.fund_account") == col("b.fund_account"), "left") \
+        .join(df_fund_account.alias("b"), col("t.fund_account_id") == col("b.fund_account_id"), "left") \
         .join(df_relo.alias("c"), col("b.branch_id") == col("c.ctp_branch_id"), "inner") \
         .groupBy("t.fund_account_id", "b.client_name", "c.oa_branch_id") \
         .agg(
@@ -150,5 +162,5 @@ def p_cockpit_analyse_top_data(spark, busi_date):
     for i in range(6, 8):  # 6-7
         write_to_hive(i)
 
-    logging.info("p_cockpit_analyse_top_data任务执行完成")
-    logging.info("本次任务为:客户分析落地表(客户分析-业务单位-)")
+    logger.info("p_cockpit_analyse_top_data任务执行完成")
+    logger.info("本次任务为:客户分析落地表(客户分析-业务单位-)")
