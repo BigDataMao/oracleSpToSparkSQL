@@ -1,7 +1,4 @@
 # *# -*- coding: utf-8 -*-
-"""
-经营分析-业务条线-单日期落地
-"""
 import logging
 
 from pyspark.sql.functions import col, lit, sum, when
@@ -9,9 +6,17 @@ from pyspark.sql.functions import col, lit, sum, when
 from utils.date_utils import get_previous_year_date, get_date_period_and_days
 from utils.task_env import return_to_hive, update_dataframe
 
+logger = logging.getLogger("logger")
+
 
 def p_cockpit_busi_ana_line_d_data(spark, busi_date):
-    logging.info("p_cockpit_busi_ana_line_d_data执行开始")
+    """
+    经营分析-业务条线-单日期落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式为"YYYYMMDD"
+    :return: None
+    """
+    logger.info("p_cockpit_busi_ana_line_d_data执行开始")
 
     # 当年第一天
     v_new_begin_date = busi_date[:4] + "0101"
@@ -23,13 +28,12 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         spark=spark,
         end_date=v_yoy_busi_date,
         is_trade_day=True
-    )
-
-    # TODO: CF_BUSIMG.T_COCKPIT_BUSI_ANALYSE_LINE_D,分区字段,busi_date
+    )[1]
 
     """
     初始化数据
     """
+    logger.info("\033[91m初始化数据\033[0m")
 
     df_x = spark.table("ddw.T_business_line").alias("t") \
         .filter(
@@ -44,8 +48,6 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         df_result=df_x,
         target_table="ddw.T_COCKPIT_BUSI_ANALYSE_LINE_D",
         insert_mode="overwrite",
-        partition_column="BUSI_DATE",
-        partition_value=busi_date
     )
 
     df_x = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_LINE_D").filter(
@@ -67,7 +69,7 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         col("busi_date") == busi_date
     ).join(
         other=spark.table("edw.h12_fund_account").alias("b"),
-        on=col("t.fund_account") == col("b.fund_account"),
+        on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
         other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
@@ -81,15 +83,16 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         how="inner"
     ).groupBy(
         col("t.fund_account_id"),
-        col("d.Business_Line_Id")
+        col("d.Business_Line_Id"),
+        when(
+            col("b.open_date").between(v_new_begin_date, v_new_end_date),
+            lit("1")
+        ).otherwise(lit("0")).alias("is_new_flag")
     ).agg(
         sum("t.rights").alias("end_rights"),
     ).select(
         col("t.fund_account_id"),
-        when(
-            col("b.open_date").between(v_new_begin_date, v_new_end_date),
-            lit(1)
-        ).otherwise(lit(0)).alias("is_new_flag"),
+        col("is_new_flag"),
         col("d.Business_Line_Id"),
         col("end_rights")
     )
@@ -98,7 +101,7 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         col("t.busi_date") == v_yoy_busi_date
     ).join(
         other=spark.table("edw.h12_fund_account").alias("b"),
-        on=col("t.fund_account") == col("b.fund_account"),
+        on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
         other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
@@ -187,11 +190,9 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         spark=spark,
         df_result=df_x,
         target_table="ddw.T_COCKPIT_BUSI_ANALYSE_LINE_D",
-        insert_mode="overwrite",
-        partition_column="BUSI_DATE",
-        partition_value=busi_date
+        insert_mode="overwrite"
     )
 
-    logging.info("p_cockpit_busi_ana_line_d_data执行完成")
-    logging.info("本次任务为:经营分析-业务条线-单日期落地")
+    logger.info("p_cockpit_busi_ana_line_d_data执行完成")
+    logger.info("本次任务为:经营分析-业务条线-单日期落地")
 
