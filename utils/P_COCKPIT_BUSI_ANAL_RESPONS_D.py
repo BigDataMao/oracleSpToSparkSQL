@@ -1,17 +1,23 @@
 # -*- coding: utf-8 -*-
-"""
-经营分析-分管部门-单日期落地
-"""
 
 import logging
 
 from pyspark.sql.functions import col, lit, sum, when
 from utils.date_utils import *
+from utils.io_utils.common_uitls import to_color_str
 from utils.task_env import return_to_hive, update_dataframe
+
+logger = logging.getLogger("logger")
 
 
 def p_cockpit_busi_anal_respons_d(spark, busi_date):
-    logging.info("p_cockpit_busi_anal_respons_d执行开始")
+    """
+    经营分析-分管部门-单日期落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式为"YYYYMMDD"
+    :return: None
+    """
+    logger.info("p_cockpit_busi_anal_respons_d执行开始")
 
     v_new_begin_date = busi_date[:4] + "0101"
     v_new_end_date = busi_date
@@ -22,7 +28,7 @@ def p_cockpit_busi_anal_respons_d(spark, busi_date):
         spark=spark,
         end_date=v_yoy_busi_date,
         is_trade_day=True
-    )
+    )[1]
 
     # 初始化数据
     df_d = spark.table("ddw.t_Respons_Line").alias("t") \
@@ -53,12 +59,13 @@ def p_cockpit_busi_anal_respons_d(spark, busi_date):
         业务指标-期末权益
         业务指标-期末权益同比
     """
+    logger.info(to_color_str("更新数据", "blue"))
 
-    tmp_new = spark.table("ddw.h15_client_sett").alias("t") \
+    tmp_new = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
         (col("t.busi_date") == busi_date)
     ).join(
-        other=spark.table("ddw.t_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
@@ -76,7 +83,8 @@ def p_cockpit_busi_anal_respons_d(spark, busi_date):
         when(
             (col("b.open_date").between(v_new_begin_date, v_new_end_date)),
             lit(1)
-        ).otherwise(lit(0)).alias("is_new_flag")
+        ).otherwise(lit(0)).alias("is_new_flag"),
+        col("d.RESPONS_LINE_ID")
     ).agg(
         sum("t.rights").alias("end_rights")
     ).select(
@@ -86,11 +94,11 @@ def p_cockpit_busi_anal_respons_d(spark, busi_date):
         col("end_rights")
     )
 
-    tmp_yoy = spark.table("ddw.h15_client_sett").alias("t") \
+    tmp_yoy = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
-        (col("t.busi_date") == v_yoy_busi_date)
+        (col("t.busi_date") == lit(v_yoy_busi_date))
     ).join(
-        other=spark.table("ddw.t_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
@@ -191,10 +199,8 @@ def p_cockpit_busi_anal_respons_d(spark, busi_date):
         spark=spark,
         df_result=df_d,
         target_table="ddw.T_COCKPIT_BUSI_ANAL_RESPONS_D",
-        insert_mode="overwrite",
-        partition_column="busi_date",
-        partition_value=busi_date
+        insert_mode="overwrite"
     )
 
-    logging.info("p_cockpit_busi_anal_respons_d执行完成")
-    logging.info("本次任务为:经营分析-分管部门-单日期落地")
+    logger.info(to_color_str("p_cockpit_busi_anal_respons_d计算完成", "green"))
+    logger.info("本次任务为:经营分析-分管部门-单日期落地")
