@@ -5,6 +5,8 @@ from pyspark.sql.functions import sum
 from utils.date_utils import *
 from utils.task_env import *
 
+logger = logging.getLogger("logger")
+
 
 @log
 def p_cockpit_busi_analyse_m_data(spark, busi_date):
@@ -16,19 +18,20 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
     v_end_date, v_now_begin_date, v_now_trade_days = get_date_period_and_days(
         spark=spark,
         busi_month=busi_date[:6],
-        end_date=datetime.now().strftime("%Y%m%d"),
+        end_date=datetime.datetime.now().strftime("%Y%m%d"),
         is_trade_day=True
     )
     v_new_begin_date = busi_date[:6] + "01"
     v_new_end_date = v_end_date
     v_now_end_date = v_end_date
+    i_month_id = busi_date[:6]
 
     # 初始化数据
     df_m = spark.table("ddw.t_oa_branch").alias("t") \
         .filter(
         col("t.canceled").isNull()
     ).select(
-        lit(busi_date).alias("BUSI_MONTH"),
+        lit(i_month_id).alias("BUSI_MONTH"),
         col("t.departmentid").alias("OA_BRANCH_ID")
     )
 
@@ -37,23 +40,21 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         df_result=df_m,
         target_table="ddw.T_COCKPIT_BUSI_ANALYSE_M",
         insert_mode="overwrite",
-        partition_column="BUSI_MONTH",
-        partition_value=busi_date[:6]
     )
 
     df_m = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_M").filter(
-        col("BUSI_MONTH") == busi_date[:6]
+        col("BUSI_MONTH") == i_month_id
     )
 
     # 财务指标 TODO
     # 收入结构 TODO
     # 业务指标-日均权益
-    tmp_new = spark.table("ddw.h15_client_sett").alias("t") \
+    tmp_new = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
         (col("t.busi_date").between(v_begin_date, v_end_date))
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
-        on=col("t.fund_account") == col("b.fund_account"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
+        on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
         other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
@@ -121,10 +122,22 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         ]
     )
 
+    # 写回hive,再次读取
+    return_to_hive(
+        spark=spark,
+        df_result=df_m,
+        target_table="ddw.T_COCKPIT_BUSI_ANALYSE_M",
+        insert_mode="overwrite"
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_M").filter(
+        col("BUSI_MONTH") == i_month_id
+    )
+
     # 业务指标-成交量
     # 业务指标-成交额
 
-    tmp_new = spark.table("ddw.h15_hold_balance").alias("t") \
+    tmp_new = spark.table("edw.h15_hold_balance").alias("t") \
         .filter(
         (col("t.busi_date").between(v_begin_date, v_end_date))
     ).join(
@@ -219,11 +232,23 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         ]
     )
 
+    # 写回hive,再次读取
+    return_to_hive(
+        spark=spark,
+        df_result=df_m,
+        target_table="ddw.T_COCKPIT_BUSI_ANALYSE_M",
+        insert_mode="overwrite"
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_M").filter(
+        col("BUSI_MONTH") == i_month_id
+    )
+
     # 市场成交量，成交额
     first_row = spark.table(
         "ddw.t_cockpit_industry_trad"
     ).filter(
-        col("etl_month") == busi_date[:6]
+        col("etl_month") == i_month_id
     ).select(
         (coalesce(sum(col("trad_num")), lit(0)) * 2).alias("total_done_amount"),
         (coalesce(sum(col("trad_amt")), lit(0)) * 2 * 100000000).alias("total_done_money")
@@ -250,7 +275,7 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
     # 市场手续费收入
     v_total_index_value = spark.table("ddw.t_cockpit_industry_manage").alias("t") \
         .filter(
-        (col("t.etl_month") == busi_date[:6]) &
+        (col("t.etl_month") == i_month_id) &
         (col("t.index_name") == "手续费收入")
     ).select(
         (coalesce(sum(col("t.index_value")), lit(0)) * 100000000).alias("total_index_value")
@@ -258,12 +283,12 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
 
     # 市场地位 --日均权益，手续费
 
-    tmp = spark.table("ddw.h15_client_sett").alias("t") \
+    tmp = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
         (col("t.busi_date").between(v_now_begin_date, v_now_end_date))
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
-        on=col("t.fund_account") == col("b.fund_account"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
+        on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
         other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
@@ -313,7 +338,7 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
             col("t.AVG_RIGHTS") / v_total_rights
         ).otherwise(lit(0)).alias("AVG_RIGHTS_MARKET_RATE"),
         when(
-            col("v_total_index_value") != 0,
+            lit(v_total_index_value) != 0,
             col("t.transfee") / v_total_index_value
         ).otherwise(lit(0)).alias("FUTU_TRANS_INCOME_MARKET_RATE")
     )
@@ -328,13 +353,25 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         ]
     )
 
+    # 写回hive,再次读取
+    return_to_hive(
+        spark=spark,
+        df_result=df_m,
+        target_table="ddw.T_COCKPIT_BUSI_ANALYSE_M",
+        insert_mode="overwrite"
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_M").filter(
+        col("BUSI_MONTH") == i_month_id
+    )
+
     # 市场地位 --日均权益，手续费
 
-    tmp = spark.table("ddw.h15_hold_balance").alias("t") \
+    tmp = spark.table("edw.h15_hold_balance").alias("t") \
         .filter(
         (col("t.busi_date").between(v_now_begin_date, v_now_end_date))
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
@@ -372,11 +409,11 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         .select(
         col("t.oa_branch_id"),
         when(
-            v_total_done_amount != 0,
+            lit(v_total_done_amount) != 0,
             col("t.done_amount") / v_total_done_amount
         ).otherwise(lit(0)).alias("DONE_AMOUNT_MARKET_RATE"),
         when(
-            v_total_done_money != 0,
+            lit(v_total_done_money) != 0,
             col("t.done_money") / v_total_done_money
         ).otherwise(lit(0)).alias("DONE_MONEY_MAREKT_RATE")
     )
@@ -396,6 +433,4 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         df_result=df_m,
         target_table="ddw.T_COCKPIT_BUSI_ANALYSE_M",
         insert_mode="overwrite",
-        partition_column="BUSI_MONTH",
-        partition_value=busi_date[:6]
     )
