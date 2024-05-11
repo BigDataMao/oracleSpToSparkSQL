@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
-
-"""
-经营分析-业务条线-经营目标完成情况-按季度
-"""
-
-import logging
-
 from utils.date_utils import *
-from utils.task_env import return_to_hive
+from utils.task_env import *
+
+logger = logging.getLogger("logger")
 
 
+@log
 def p_cockpit_busi_anal_tar_line_q(spark, busi_date):
-    logging.info("p_cockpit_busi_anal_tar_line_q执行开始")
+    """
+    经营分析-业务单位-考核指标落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式为"YYYYMMDD"
+    :return: None
+    """
+    logger.info("p_cockpit_busi_anal_tar_line_q执行开始")
 
     v_busi_year = busi_date[:4]
     v_BUSI_QUARTER = get_quarter(busi_date)
@@ -37,10 +39,8 @@ def p_cockpit_busi_anal_tar_line_q(spark, busi_date):
     df_q = spark.table("ddw.T_business_line").alias("t") \
         .filter(
         col("t.if_use") == "1"
-    ).join(
-        other=spark.table("ddw.T_BUSI_ANAL_TARGET_TYPE").alias("a"),
-        on=None,
-        how="inner"
+    ).crossJoin(
+        other=spark.table("ddw.T_BUSI_ANAL_TARGET_TYPE").alias("a")
     ).select(
         lit(v_busi_year).alias("BUSI_YEAR"),
         lit(v_BUSI_QUARTER).alias("BUSI_QUARTER"),
@@ -53,9 +53,7 @@ def p_cockpit_busi_anal_tar_line_q(spark, busi_date):
         spark=spark,
         df_result=df_q,
         target_table="ddw.T_COCKPIT_BUSI_ANAL_TAR_LINE_Q",
-        insert_mode="overwrite",
-        partition_column=["BUSI_YEAR", "BUSI_QUARTER"],
-        partition_value=[v_busi_year, v_BUSI_QUARTER]
+        insert_mode="overwrite"
     )
 
     df_q = spark.table("ddw.T_COCKPIT_BUSI_ANAL_TAR_LINE_Q").filter(
