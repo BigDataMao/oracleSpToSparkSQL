@@ -1,18 +1,24 @@
 # *# -*- coding: utf-8 -*-
-"""
-经营分析-业务条线-按月落地
-"""
 import logging
 from datetime import datetime
 
 from pyspark.sql.functions import col, lit, sum, when, coalesce
 
 from utils.date_utils import get_previous_year_date, get_date_period_and_days
+from utils.io_utils.common_uitls import to_color_str
 from utils.task_env import return_to_hive, update_dataframe
+
+logger = logging.getLogger("logger")
 
 
 def p_cockpit_busi_ana_line_m_data(spark, busi_date):
-    logging.info("p_cockpit_busi_ana_line_m_data执行开始")
+    """
+    经营分析-业务条线-按月落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式为"YYYYMMDD"
+    :return: None
+    """
+    logger.info("p_cockpit_busi_ana_line_m_data执行开始")
 
     v_begin_date = busi_date[:4] + "0101"
     i_month_id = busi_date[:6]
@@ -21,7 +27,7 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
     (
         v_end_date,
         v_now_begin_date,
-        v_now_trade_days
+        v_busi_trade_days
     ) = get_date_period_and_days(
         spark=spark,
         busi_month=i_month_id,
@@ -40,9 +46,11 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
     v_new_end_date = v_end_date
     v_now_end_date = v_end_date
 
-    # TODO: CF_BUSIMG.T_COCKPIT_BUSI_ANA_LINE_M,分区字段,busi_month
+    # TODO: CF_BUSIMG.T_COCKPIT_BUSI_ANALYSE_LINE_M,分区字段,busi_month
 
     # 初始化数据
+    logger.info(to_color_str("初始化数据", "red"))
+
     df_m = spark.table("ddw.T_business_line").alias("t") \
         .filter(
         col("t.if_use") == "1"
@@ -55,13 +63,11 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
     return_to_hive(
         spark=spark,
         df_result=df_m,
-        target_table="ddw.T_COCKPIT_BUSI_ANA_LINE_M",
-        insert_mode="overwrite",
-        partition_column="busi_month",
-        partition_value=i_month_id
+        target_table="ddw.T_COCKPIT_BUSI_ANALYSE_LINE_M",
+        insert_mode="overwrite"
     )
 
-    df_m = spark.table("ddw.T_COCKPIT_BUSI_ANA_LINE_M") \
+    df_m = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_LINE_M") \
         .filter(
         col("BUSI_MONTH") == i_month_id
     )
@@ -71,12 +77,13 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
     收入结构
     业务指标-日均权益
     """
+    logger.info(to_color_str("财务指标", "red"))
 
-    tmp_new = spark.table("ddw.h15_t_client_sett").alias("t") \
+    tmp_new = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
         (col("t.busi_date").between(v_begin_date, v_end_date))
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(col("t.fund_account_id") == col("b.fund_account_id")),
         how="left"
     ).join(
@@ -109,15 +116,15 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
         .select(
         col("t.business_line_id"),
         when(
-            (col("t.is_new_flag") == "1") & (v_busi_trade_days != 0),
+            (col("t.is_new_flag") == "1") & (lit(v_busi_trade_days) != 0),
             col("t.sum_rights") / v_busi_trade_days
         ).otherwise(lit(0)).alias("AVG_RIGHTS_NEW"),
         when(
-            (col("t.is_new_flag") == "0") & (v_busi_trade_days != 0),
+            (col("t.is_new_flag") == "0") & (lit(v_busi_trade_days) != 0),
             col("t.sum_rights") / v_busi_trade_days
         ).otherwise(lit(0)).alias("AVG_RIGHTS_STOCK"),
         when(
-            (v_busi_trade_days != 0),
+            (lit(v_busi_trade_days) != 0),
             col("t.sum_rights") / v_busi_trade_days
         ).otherwise(lit(0)).alias("sum_avg_rights")
     )
@@ -150,16 +157,29 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
         ]
     )
 
+    # 写回hive,再重读分区
+    return_to_hive(
+        spark=spark,
+        df_result=df_m,
+        target_table="ddw.T_COCKPIT_BUSI_ANALYSE_LINE_M",
+        insert_mode="overwrite"
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_LINE_M").filter(
+        col("BUSI_MONTH") == i_month_id
+    )
+
     """
     业务指标-成交量
     业务指标-成交额
     """
+    logger.info(to_color_str("业务指标-成交量,成交额", "red"))
 
-    tmp_new = spark.table("ddw.h15_hold_balance").alias("t") \
+    tmp_new = spark.table("edw.h15_hold_balance").alias("t") \
         .filter(
         (col("t.busi_date").between(v_begin_date, v_end_date))
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(col("t.fund_account_id") == col("b.fund_account_id")),
         how="left"
     ).join(
@@ -194,19 +214,19 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
         .select(
         col("t.business_line_id"),
         when(
-            (col("t.is_new_flag") == "1") & (v_busi_trade_days != 0),
+            (col("t.is_new_flag") == "1") & (lit(v_busi_trade_days) != 0),
             col("t.sum_done_amt")
         ).otherwise(lit(0)).alias("DONE_AMOUNT_NEW"),
         when(
-            (col("t.is_new_flag") == "0") & (v_busi_trade_days != 0),
+            (col("t.is_new_flag") == "0") & (lit(v_busi_trade_days) != 0),
             col("t.sum_done_amt")
         ).otherwise(lit(0)).alias("DONE_AMOUNT_STOCK"),
         when(
-            (col("t.is_new_flag") == "1") & (v_busi_trade_days != 0),
+            (col("t.is_new_flag") == "1") & (lit(v_busi_trade_days) != 0),
             col("t.sum_done_sum")
         ).otherwise(lit(0)).alias("DONE_MONEY_NEW"),
         when(
-            (col("t.is_new_flag") == "0") & (v_busi_trade_days != 0),
+            (col("t.is_new_flag") == "0") & (lit(v_busi_trade_days) != 0),
             col("t.sum_done_sum")
         ).otherwise(lit(0)).alias("DONE_MONEY_STOCK"),
         col("t.sum_done_amt").alias("SUM_DONE_AMOUNT"),
@@ -255,10 +275,23 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
         ]
     )
 
+    # 写回hive,再重读分区
+    return_to_hive(
+        spark=spark,
+        df_result=df_m,
+        target_table="ddw.T_COCKPIT_BUSI_ANALYSE_LINE_M",
+        insert_mode="overwrite"
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_LINE_M").filter(
+        col("BUSI_MONTH") == i_month_id
+    )
+
     """
     市场成交量，成交额
     取中期协月度交易数据
     """
+    logger.info(to_color_str("市场成交量,成交额", "red"))
 
     (
         v_total_done_amount,
@@ -288,8 +321,8 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
     v_total_rights = tmp.alias("t") \
         .select(
         when(
-            (v_now_trade_days != 0),
-            col("t.rights") / v_now_trade_days
+            (lit(lit(v_busi_trade_days)) != 0),
+            col("t.rights") / lit(v_busi_trade_days)
         ).otherwise(lit(0)).alias("rights")
     ).first()["rights"]
 
@@ -311,11 +344,11 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
     市场地位 --日均权益，手续费
     """
 
-    tmp = spark.table("ddw.h15_t_client_sett").alias("t") \
+    tmp = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
         (col("t.busi_date").between(v_now_begin_date, v_now_end_date))
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(col("t.fund_account_id") == col("b.fund_account_id")),
         how="left"
     ).join(
@@ -351,8 +384,8 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
     ).agg(
         sum(
             when(
-                (v_now_trade_days != 0),
-                col("t.rights") / v_now_trade_days
+                (lit(v_busi_trade_days) != 0),
+                col("t.rights") / lit(v_busi_trade_days)
             ).otherwise(lit(0))
         ).alias("AVG_RIGHTS"),
         sum(col("t.transfee")).alias("TRANSFEE")
@@ -366,11 +399,11 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
         .select(
         col("t.business_line_id"),
         when(
-            (v_total_rights != 0),
+            (lit(v_total_rights) != 0),
             col("t.AVG_RIGHTS") / v_total_rights
         ).otherwise(lit(0)).alias("AVG_RIGHTS_MARKET_RATE"),
         when(
-            (v_total_index_value != 0),
+            (lit(v_total_index_value) != 0),
             col("t.TRANSFEE") / v_total_index_value
         ).otherwise(lit(0)).alias("FUTU_TRANS_INCOME_MARKET_RATE")
     )
@@ -386,15 +419,28 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
         ]
     )
 
+    # 写回hive,再重读分区
+    return_to_hive(
+        spark=spark,
+        df_result=df_m,
+        target_table="ddw.T_COCKPIT_BUSI_ANALYSE_LINE_M",
+        insert_mode="overwrite"
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_LINE_M").filter(
+        col("BUSI_MONTH") == i_month_id
+    )
+
     """
     市场地位 --日均权益，手续费
     """
+    logger.info(to_color_str("市场地位 --日均权益，手续费", "red"))
 
-    tmp = spark.table("ddw.h15_hold_balance").alias("t") \
+    tmp = spark.table("edw.h15_hold_balance").alias("t") \
         .filter(
         (col("t.busi_date").between(v_now_begin_date, v_now_end_date))
     ).join(
-        other=spark.table("ddw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").alias("b"),
         on=(col("t.fund_account_id") == col("b.fund_account_id")),
         how="left"
     ).join(
@@ -436,11 +482,11 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
         .select(
         col("t.business_line_id"),
         when(
-            (v_total_done_amount != 0),
+            (lit(v_total_done_amount) != 0),
             col("t.done_amount") / v_total_done_amount
         ).otherwise(lit(0)).alias("DONE_AMOUNT_MARKET_RATE"),
         when(
-            (v_total_done_money != 0),
+            (lit(v_total_done_money) != 0),
             col("t.done_money") / v_total_done_money
         ).otherwise(lit(0)).alias("DONE_MONEY_MAREKT_RATE")
     )
@@ -456,5 +502,5 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
         ]
     )
 
-    logging.info("p_cockpit_busi_ana_line_m_data执行完成")
-    logging.info("本次任务为: 经营分析-业务条线-按月落地")
+    logger.info("p_cockpit_busi_ana_line_m_data执行完成")
+    logger.info("本次任务为: 经营分析-业务条线-按月落地")
