@@ -5,6 +5,8 @@ from pyspark.sql.functions import sum
 from utils.date_utils import *
 from utils.task_env import *
 
+logger = logging.getLogger("logger")
+
 
 @log
 def p_cockpit_busi_analyse_d_data(spark, busi_date):
@@ -36,9 +38,7 @@ def p_cockpit_busi_analyse_d_data(spark, busi_date):
         spark=spark,
         df_result=df_d,
         target_table="ddw.T_COCKPIT_BUSI_ANALYSE_D",
-        insert_mode="overwrite",
-        partition_column="BUSI_DATE",
-        partition_value=busi_date
+        insert_mode="overwrite"
     )
 
     df_d = spark.table("ddw.T_COCKPIT_BUSI_ANALYSE_D").filter(
@@ -54,13 +54,14 @@ def p_cockpit_busi_analyse_d_data(spark, busi_date):
         业务指标-期末权益
         业务指标-期末权益同比
     """
+    logger.info(to_color_str("更新数据", "blue"))
 
     tmp_new = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
         col("busi_date") == busi_date
     ).join(
         other=spark.table("edw.h12_fund_account").alias("b"),
-        on=col("t.fund_account") == col("b.fund_account"),
+        on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
         other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
@@ -85,7 +86,7 @@ def p_cockpit_busi_analyse_d_data(spark, busi_date):
         col("t.busi_date") == v_yoy_busi_date
     ).join(
         other=spark.table("edw.h12_fund_account").alias("b"),
-        on=col("t.fund_account") == col("b.fund_account"),
+        on=col("t.fund_account_id") == col("b.fund_account_id"),
         how="left"
     ).join(
         other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
@@ -109,14 +110,14 @@ def p_cockpit_busi_analyse_d_data(spark, busi_date):
         col("t.oa_branch_id")
     ).agg(
         sum("t.end_rights").alias("total_end_rights"),
-        when(
+        sum(when(
             col("t.is_new_flag") == "1",
             col("t.end_rights")
-        ).otherwise(0).alias("new_end_rights"),
-        when(
+        ).otherwise(0)).alias("new_end_rights"),
+        sum(when(
             col("t.is_new_flag") == "0",
             col("t.end_rights")
-        ).otherwise(0).alias("stock_end_rights")
+        ).otherwise(0)).alias("stock_end_rights")
     ).select(
         col("t.oa_branch_id"),
         col("total_end_rights"),
@@ -177,6 +178,4 @@ def p_cockpit_busi_analyse_d_data(spark, busi_date):
         df_result=df_d,
         target_table="ddw.T_COCKPIT_BUSI_ANALYSE_D",
         insert_mode="overwrite",
-        partition_column="BUSI_DATE",
-        partition_value=busi_date
     )
