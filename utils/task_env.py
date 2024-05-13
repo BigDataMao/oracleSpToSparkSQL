@@ -9,6 +9,8 @@ import traceback
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, col, coalesce, expr, when
 
+from utils.io_utils.common_uitls import to_color_str
+
 logger = logging.getLogger("logger")
 
 
@@ -24,6 +26,7 @@ def create_env():
         .config("spark.debug.maxToStringFields", "300") \
         .config("spark.driver.extraJavaOptions", "-Dfile.encoding=UTF-8") \
         .config("spark.executor.extraJavaOptions", "-Dfile.encoding=UTF-8") \
+        .config("hive.metastore.event.db.notification.api.auth", "true") \
         .enableHiveSupport() \
         .getOrCreate()
     spark.sparkContext.setLogLevel("WARN")
@@ -51,11 +54,11 @@ def log(func):
         try:
             result_func = func(*args, **kwargs)
         except Exception as e:
-            logger.error("函数 %s 执行出错: %s", func_name, e)
+            logger.error(to_color_str("函数 {} 执行出错: {}".format(func_name, str(e)[:200]), "red"))
             raise
 
         end_time = datetime.datetime.now()
-        logger.info("函数 %s 执行完成", func_name)
+        logger.info(to_color_str("函数 {} 执行完成".format(func_name), "green"))
         duration = end_time - begin_time
         # 转成分秒,整数
         duration = divmod(duration.seconds, 60)
