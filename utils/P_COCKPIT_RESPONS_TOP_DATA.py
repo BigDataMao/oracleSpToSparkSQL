@@ -1,18 +1,22 @@
 # -*- coding: utf-8 -*-
-"""
-客户分析落地表(客户分析-分管部门-)
-"""
 import logging
-from datetime import datetime, timedelta
 
 from pyspark.sql import Window
 from pyspark.sql.functions import col, lit, sum, rank
 
 from utils.date_utils import get_mon_sun_str, get_busi_week_int
-from utils.task_env import return_to_hive, update_dataframe
+from utils.task_env import return_to_hive
+
+logger = logging.getLogger("logger")
 
 
 def p_cockpit_respons_top_data(spark, busi_date):
+    """
+    客户分析落地表(客户分析-分管部门-)
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式为"YYYYMMDD"
+    :return: None
+    """
     v_busi_year = busi_date[:4]
     v_rank_no = 9
 
@@ -45,11 +49,11 @@ def p_cockpit_respons_top_data(spark, busi_date):
         (col("RESPONS_LINE_ID").isNotNull())
     )
 
-    logging.info("第1-5个指标开始计算")
+    logger.info("第1-5个指标开始计算")
     tmp = df_sett.alias("t") \
-        .join(df_fund_account.alias("b"), col("t.fund_account") == col("b.fund_account"), "left") \
+        .join(df_fund_account.alias("b"), col("t.fund_account_id") == col("b.fund_account_id"), "left") \
         .join(df_relo.alias("c"), col("b.branch_id") == col("c.ctp_branch_id"), "inner") \
-        .join(df_oa_branch.alias("d"), col("c.oa_branch_id") == col("d.oa_branch_id"), "inner") \
+        .join(df_oa_branch.alias("d"), col("c.oa_branch_id") == col("d.departmentid"), "inner") \
         .groupBy("t.fund_account_id", "b.client_name", "d.RESPONS_LINE_ID") \
         .agg(
         sum("t.fund_in").alias("fund_in"),
@@ -105,7 +109,7 @@ def p_cockpit_respons_top_data(spark, busi_date):
             col("t.rank_no_" + num).alias("rank_no"),
             lit(num).alias("index_type")
         ).filter(
-            col("t.rank_no") <= v_rank_no
+            col("t.rank_no_" + num) <= v_rank_no
         )
 
         return_to_hive(
@@ -117,12 +121,13 @@ def p_cockpit_respons_top_data(spark, busi_date):
             partition_value=[v_busi_year, v_busi_week]
         )
 
-        logging.info("本次任务共7个指标,已完成第{}个指标".format(num))
+        logger.info("本次任务共7个指标,已完成第{}个指标".format(num))
 
     for i in range(1, 6):  # 1-5
+        logger.info("开始计算第{}个指标".format(i))
         write_to_hive(i)
 
-    logging.info("第6-7个指标开始计算")
+    logger.info("第6-7个指标开始计算")
 
     """
     6：成交量前9名，7：成交额前9名
@@ -130,9 +135,9 @@ def p_cockpit_respons_top_data(spark, busi_date):
     """
 
     tmp = df_hold_balance.alias("t") \
-        .join(df_fund_account.alias("b"), col("t.fund_account") == col("b.fund_account"), "left") \
+        .join(df_fund_account.alias("b"), col("t.fund_account_id") == col("b.fund_account_id"), "left") \
         .join(df_relo.alias("c"), col("b.branch_id") == col("c.ctp_branch_id"), "inner") \
-        .join(df_oa_branch.alias("d"), col("c.oa_branch_id") == col("d.oa_branch_id"), "inner") \
+        .join(df_oa_branch.alias("d"), col("c.oa_branch_id") == col("d.departmentid"), "inner") \
         .groupBy("t.fund_account_id", "b.client_name", "d.RESPONS_LINE_ID") \
         .agg(
         sum("t.done_amt").alias("done_amt"),
@@ -155,7 +160,8 @@ def p_cockpit_respons_top_data(spark, busi_date):
         rank().over(Window.partitionBy("t.RESPONS_LINE_ID").orderBy(col("t.done_sum").desc())).alias("rank_no_7"))
 
     for i in range(6, 8):  # 6-7
+        logger.info("开始计算第{}个指标".format(i))
         write_to_hive(i)
 
-    logging.info("p_cockpit_respons_top_data任务执行完成")
-    logging.info("本次任务为:客户分析落地表(客户分析-分管部门-)")
+    logger.info("p_cockpit_respons_top_data任务执行完成")
+    logger.info("本次任务为:客户分析落地表(客户分析-分管部门-)")
