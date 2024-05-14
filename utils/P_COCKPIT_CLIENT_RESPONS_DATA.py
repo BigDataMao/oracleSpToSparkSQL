@@ -7,11 +7,16 @@ from pyspark.sql.functions import col, lit, sum, when, substring, regexp_replace
 from utils.date_utils import *
 from utils.task_env import *
 
+logger = logging.getLogger("logger")
+
 
 @log
 def p_cockpit_client_respons_data(spark, busi_date):
     """
     客户分析落地表(客户分析-分管部门)
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期
+    :return: None
     """
 
     v_busi_month = busi_date[:6]
@@ -53,6 +58,7 @@ def p_cockpit_client_respons_data(spark, busi_date):
     )[2]
 
     # 初始化数据
+    logger.info(to_color_str("初始化数据", "blue"))
 
     df_m = spark.table("ddw.t_Respons_Line").alias("t") \
         .filter(
@@ -68,8 +74,6 @@ def p_cockpit_client_respons_data(spark, busi_date):
         target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
         df_result=df_m,
         insert_mode="overwrite",
-        partition_column=["busi_month"],
-        partition_value=v_busi_month
     )
 
     df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
@@ -78,6 +82,7 @@ def p_cockpit_client_respons_data(spark, busi_date):
     )
 
     # 权益结构
+    logger.info(to_color_str("权益结构", "blue"))
 
     tmp = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
@@ -266,7 +271,7 @@ def p_cockpit_client_respons_data(spark, busi_date):
 
     df_y = tmp_result.alias("t") \
         .select(
-        col("t.RESPONS_LINE_ID"),
+        col("RESPONS_LINE_ID"),
         col("t.rights_1"),
         (
                 when(
@@ -304,7 +309,20 @@ def p_cockpit_client_respons_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
+        df_result=df_m,
+        insert_mode="overwrite",
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
+        .filter(
+        col("t.busi_month") == v_busi_month
+    )
+
     # 新增权益结构
+    logger.info(to_color_str("新增权益结构", "blue"))
 
     tmp = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
@@ -422,8 +440,21 @@ def p_cockpit_client_respons_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
+        df_result=df_m,
+        insert_mode="overwrite",
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
+        .filter(
+        col("t.busi_month") == v_busi_month
+    )
+
     # 成交量结构
     # 成交额结构
+    logger.info(to_color_str("成交量结构", "blue"))
 
     tmp = spark.table("edw.h15_hold_balance").alias("t") \
         .filter(
@@ -728,10 +759,23 @@ def p_cockpit_client_respons_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
+        df_result=df_m,
+        insert_mode="overwrite",
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
+        .filter(
+        col("t.busi_month") == v_busi_month
+    )
+
     # 经纪业务收入结构
     # TODO: 暂时没有逻辑，不开发
 
     # 增量权益分析-当年新开客户权益(万元)
+    logger.info(to_color_str("增量权益分析-当年新开客户权益(万元)", "blue"))
 
     tmp = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
@@ -790,8 +834,21 @@ def p_cockpit_client_respons_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
+        df_result=df_m,
+        insert_mode="overwrite",
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
+        .filter(
+        col("t.busi_month") == v_busi_month
+    )
+
     # 增量权益分析-老客户权益变化值(万元)
     # 排除当年新增客户日均权益的所有客户的日群权益，减掉去年全年客户日均权益
+    logger.info(to_color_str("增量权益分析-老客户权益变化值(万元)", "blue"))
 
     tmp = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
@@ -903,14 +960,27 @@ def p_cockpit_client_respons_data(spark, busi_date):
     df_m = update_dataframe(
         df_to_update=df_m,
         df_use_me=df_y,
-        join_columns=["RESPONS_LINE_ID"],
+        join_columns=["respons_line_id"],
         update_columns=[
             "RIGHTS_ADD_OLD"
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
+        df_result=df_m,
+        insert_mode="overwrite",
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
+        .filter(
+        col("t.busi_month") == v_busi_month
+    )
+
     # 客户年龄结构
     # 有效客户年龄结构
+    logger.info(to_color_str("客户年龄结构", "blue"))
 
     tmp = spark.table("edw.h15_hold_balance").alias("t") \
         .filter(
@@ -937,13 +1007,10 @@ def p_cockpit_client_respons_data(spark, busi_date):
         how="inner"
     ).filter(
         col("d.RESPONS_LINE_ID").isNotNull()
-    ).groupBy(
-        col("t.fund_account_id"),
-        col("d.RESPONS_LINE_ID")
     ).select(
         col("t.fund_account_id"),
         col("d.RESPONS_LINE_ID")
-    )
+    ).drop_duplicates()
 
     tmp_1 = tmp.alias("t") \
         .join(
@@ -1009,9 +1076,22 @@ def p_cockpit_client_respons_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
+        df_result=df_m,
+        insert_mode="overwrite",
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
+        .filter(
+        col("t.busi_month") == v_busi_month
+    )
+
     # 客户年龄结构
     # 新增有效客户年龄结构
     # 新开户
+    logger.info(to_color_str("客户年龄结构", "blue"))
 
     tmp = spark.table("edw.h15_hold_balance").alias("t") \
         .filter(
@@ -1040,13 +1120,10 @@ def p_cockpit_client_respons_data(spark, busi_date):
         how="inner"
     ).filter(
         col("d.RESPONS_LINE_ID").isNotNull()
-    ).groupBy(
-        col("t.fund_account_id"),
-        col("d.RESPONS_LINE_ID")
     ).select(
         col("t.fund_account_id"),
         col("d.RESPONS_LINE_ID")
-    )
+    ).drop_duplicates()
 
     tmp_1 = tmp.alias("t") \
         .join(
@@ -1112,7 +1189,20 @@ def p_cockpit_client_respons_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
+        df_result=df_m,
+        insert_mode="overwrite",
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
+        .filter(
+        col("t.busi_month") == v_busi_month
+    )
+
     # 计算客户的净贡献
+    logger.info(to_color_str("计算客户的净贡献", "blue"))
 
     # TODO: 以下逻辑看花眼,自动生成没检查
     df_jgx = spark.table("ods.t_ds_adm_investor_value").alias("a") \
@@ -1239,6 +1329,7 @@ def p_cockpit_client_respons_data(spark, busi_date):
     千万工程-成交额, (亿元)
     千万工程-净贡献(万元)
     """
+    logger.info("开始计算千万工程-有效客户数, 千万工程-日均权益, 千万工程-成交量, 千万工程-成交额, 千万工程-净贡献")
 
     my_dict = {
         "BQ4909": "QW",
@@ -1304,13 +1395,13 @@ def p_cockpit_client_respons_data(spark, busi_date):
             col("client_num")
         )
 
-        df_tmp_1 = df_tmp.alias("a") \
+        df_tmp_1 = spark.table("edw.h15_client_sett").alias("t") \
             .filter(
             (col("t.busi_date").between(v_begin_date, v_end_date))
         ).join(
-            other=spark.table("edw.h15_client_sett").alias("t"),
+            other=df_tmp.alias("a"),
             on=(
-                    col("a.fund_account_id") == col("t.fund_account_id")
+                    col("t.fund_account_id") == col("a.fund_account_id")
             ),
             how="inner"
         ).groupBy(
@@ -1334,8 +1425,8 @@ def p_cockpit_client_respons_data(spark, busi_date):
         ).groupBy(
             col("a.RESPONS_LINE_ID")
         ).agg(
-            sum("t.done_amount").alias("done_amount"),
-            sum("t.done_money").alias("done_sum")
+            sum("t.done_amt").alias("done_amount"),
+            sum("t.done_sum").alias("done_sum")
         ).select(
             col("a.RESPONS_LINE_ID"),
             col("done_amount"),
@@ -1377,11 +1468,11 @@ def p_cockpit_client_respons_data(spark, busi_date):
             how="left"
         ).select(
             col("t.RESPONS_LINE_ID"),
-            coalesce(col("a.client_num"), lit(0)).alias("%s_CLIENT_NUM".format(prefix)),
-            (coalesce(col("b.avg_rights"), lit(0)) / 100000000).alias("%s_AVG_RIGHTS".format(prefix)),
-            (coalesce(col("c.done_amount"), lit(0)) / 10000).alias("%s_DONE_AMOUNT".format(prefix)),
-            (coalesce(col("c.done_sum"), lit(0)) / 100000000).alias("%s_DONE_MONEY".format(prefix)),
-            (coalesce(col("d.jgx"), lit(0)) / 10000).alias("%s_NET_CONTRIBUTION".format(prefix))
+            coalesce(col("a.client_num"), lit(0)).alias("{}_CLIENT_NUM".format(prefix)),
+            (coalesce(col("b.avg_rights"), lit(0)) / 100000000).alias("{}_AVG_RIGHTS".format(prefix)),
+            (coalesce(col("c.done_amount"), lit(0)) / 10000).alias("{}_DONE_AMOUNT".format(prefix)),
+            (coalesce(col("c.done_sum"), lit(0)) / 100000000).alias("{}_DONE_MONEY".format(prefix)),
+            (coalesce(col("d.jgx"), lit(0)) / 10000).alias("{}_NET_CONTRIBUTION".format(prefix))
         )
 
         df_m_func = update_dataframe(
@@ -1389,11 +1480,11 @@ def p_cockpit_client_respons_data(spark, busi_date):
             df_use_me=df_y_func,
             join_columns=["RESPONS_LINE_ID"],
             update_columns=[
-                "%s_CLIENT_NUM".format(prefix),
-                "%s_AVG_RIGHTS".format(prefix),
-                "%s_DONE_AMOUNT".format(prefix),
-                "%s_DONE_MONEY".format(prefix),
-                "%s_NET_CONTRIBUTION".format(prefix)
+                "{}_CLIENT_NUM".format(prefix),
+                "{}_AVG_RIGHTS".format(prefix),
+                "{}_DONE_AMOUNT".format(prefix),
+                "{}_DONE_MONEY".format(prefix),
+                "{}_NET_CONTRIBUTION".format(prefix)
             ]
         )
 
@@ -1402,11 +1493,21 @@ def p_cockpit_client_respons_data(spark, busi_date):
     for key, value in my_dict.items():
         df_m = cal_qw_gp_gjz_tb(key, value, df_m)
 
+        return_to_hive(
+            spark=spark,
+            target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
+            df_result=df_m,
+            insert_mode="overwrite",
+        )
+
+        df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANAL_RESPONS").alias("t") \
+            .filter(
+            col("t.busi_month") == v_busi_month
+        )
+
     return_to_hive(
         spark=spark,
         df_result=df_m,
         target_table="ddw.T_COCKPIT_CLIENT_ANAL_RESPONS",
         insert_mode="overwrite",
-        partition_column=["busi_month"],
-        partition_value=v_busi_month
     )
