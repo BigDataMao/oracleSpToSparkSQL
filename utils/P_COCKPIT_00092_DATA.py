@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
-"""
-宏源-千万工程”指标落地数据
-逻辑依据: utils/P_COCKPIT_00092_DATA.sql
-"""
-
-from pyspark.sql.functions import sum, round, count
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import sum, round, count, first
 
 from utils.date_utils import get_date_period_and_days
 from utils.task_env import *
@@ -14,6 +10,12 @@ logger = logging.getLogger("logger")
 
 @log
 def p_cockpit_00092_data(spark, busi_date):
+    """
+    宏源-千万工程”指标落地数据
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式为YYYYMMDD
+    :return: None
+    """
     v_busi_year = busi_date[:4]
     v_begin_date = v_busi_year + "0101"
     v_end_date = busi_date
@@ -39,6 +41,7 @@ def p_cockpit_00092_data(spark, busi_date):
     """
     本年度,上年度的千万工程客户
     """
+    logger.info(to_color_str("开始计算本年度,上年度的千万工程客户", "blue"))
 
     dict_data = {
         "this_year": {
@@ -54,14 +57,13 @@ def p_cockpit_00092_data(spark, busi_date):
     }
 
     for value in dict_data.values():
-        df_92_tmp = spark.table("ods.T_CRMMG_HIS_LABEL_CLIENT").alias("t") \
-            .filter(
+        df_92_tmp = (spark.table("ods.T_CRMMG_HIS_LABEL_CLIENT").alias("t").filter(
             col("t.months").between(value["begin"], value["end"])
         ).join(
             other=spark.table("ods.T_CRMMG_LABEL").alias("a"),
             on=(
-                col("t.label_id") == col("a.label_id"),
-                col("a.label_id") == lit("BQ4909")
+                    (col("t.label_id") == col("a.label_id")) &
+                    (col("a.label_id") == lit("BQ4909"))
             ),
             how="inner"
         ).join(
@@ -73,20 +75,20 @@ def p_cockpit_00092_data(spark, busi_date):
         ).join(
             other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
             on=(
-                    col("b.branch_id") == col("c.branch_id")
+                    col("b.branch_id") == col("c.ctp_branch_id")
             ),
             how="inner"
-        ).groupBy(
-            "b.fund_account_id",
-            "c.oa_branch_id",
-            "b.client_type",
-            "b.open_date"
         ).select(
-            "b.fund_account_id",
-            "c.oa_branch_id",
-            "b.client_type",
-            "b.open_date"
-        )
+            col("b.fund_account_id").alias("fund_account_id"),
+            col("c.oa_branch_id").alias("oa_branch_id"),
+            col("b.client_type").alias("client_type"),
+            col("b.open_date").alias("open_date")
+        ).dropDuplicates(
+            ["fund_account_id",
+             "oa_branch_id",
+             "client_type",
+             "open_date"]
+        ))
 
         value["df_92_tmp"] = df_92_tmp
 
@@ -97,8 +99,6 @@ def p_cockpit_00092_data(spark, busi_date):
             insert_mode="overwrite",
         )
 
-        logging.info("ddw.T_BRP_00092_QW%s[全量数据],写入完成", value["suffix"])
-
     # 读取两个df
     df_qw = dict_data["this_year"]["df_92_tmp"]
     df_qw_last = dict_data["last_year"]["df_92_tmp"]
@@ -106,6 +106,7 @@ def p_cockpit_00092_data(spark, busi_date):
     """
     计算客户本年的净贡献,和上年的净贡献
     """
+    logger.info(to_color_str("计算客户本年的净贡献,和上年的净贡献", "blue"))
 
     dict_data = {
         "this_year": {
@@ -127,13 +128,13 @@ def p_cockpit_00092_data(spark, busi_date):
         ).join(
             other=spark.table("ods.T_DS_ADM_BROKERDATA_DETAIL").alias("a2"),
             on=(
-                    col("a.date_dt") == col("a2.tx_dt") &
-                    col("a.investor_id") == col("a2.investor_id") &
-                    col("a2.rec_freq") == lit("M")
+                    (col("a.date_dt") == col("a2.tx_dt")) &
+                    (col("a.investor_id") == col("a2.investor_id")) &
+                    (col("a2.rec_freq") == lit("M"))
             ),
             how="left"
         ).groupBy(
-            "a.investor_id"
+            col("a.investor_id").alias("client_id")
         ).agg(
             (
                     sum(col("a.subsistence_fee_amt")) +
@@ -157,7 +158,7 @@ def p_cockpit_00092_data(spark, busi_date):
                     round(sum(col("a.staff_eret_amt")), 2)
             ).alias("jgx")
         ).select(
-            "a.investor_id",
+            "client_id",
             "jgx"
         )
 
@@ -170,7 +171,7 @@ def p_cockpit_00092_data(spark, busi_date):
             insert_mode="overwrite",
         )
 
-        logging.info("ddw.TMP_COCKPIT_CLIENT_%s[全量数据],写入完成", value["suffix"])
+        logger.info("ddw.TMP_COCKPIT_CLIENT_%s[全量数据],写入完成", value["suffix"])
 
     # 读取两个df
     df_jgx = dict_data["this_year"]["df_jgx"]
@@ -179,6 +180,7 @@ def p_cockpit_00092_data(spark, busi_date):
     """
     初始化CF_BUSIMG.T_BRP_00092
     """
+    logger.info(to_color_str("初始化CF_BUSIMG.T_BRP_00092", "blue"))
 
     df_92_y = spark.table("ddw.T_OA_BRANCH").alias("b") \
         .filter(
@@ -194,22 +196,21 @@ def p_cockpit_00092_data(spark, busi_date):
         df_result=df_92_y,
         target_table="ddw.T_BRP_00092",
         insert_mode="overwrite",
-        partition_column="busi_year",
-        partition_value=v_busi_year
     )
 
-    logging.info("ddw.T_BRP_00092[初始化数据],写入完成")
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
 
     df_92_y = spark.table("ddw.T_BRP_00092") \
         .filter(
         col("busi_year") == lit(v_busi_year)
     )
 
-    logging.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
 
     """
     日均权益
     """
+    logger.info("开始计算日均权益")
 
     tmp1_grouped = spark.table("edw.h15_client_sett").alias("t") \
         .filter(
@@ -302,9 +303,27 @@ def p_cockpit_00092_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
     """
     手续费
     """
+    logger.info("开始计算手续费")
+
 
     tmp1 = tmp1_grouped.agg(
         sum(
@@ -338,7 +357,7 @@ def p_cockpit_00092_data(spark, busi_date):
         ).alias("transfee_0"),
         (
             sum(
-                col("t.rights")
+                col("t.transfee")
             )
         ).alias("transfee_all")
     ).select(
@@ -384,25 +403,42 @@ def p_cockpit_00092_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
     """
     客户数
     """
+    logger.info("开始计算客户数")
 
-    tmp1 = spark.table("edw.h12_fund_account").alias("t") \
-        .join(
+
+    tmp1 = spark.table("edw.h12_fund_account").alias("t").join(
         other=df_qw.alias("a"),
         on=(
                 col("t.fund_account_id") == col("a.fund_account_id")
         ),
         how="inner"
-    ).groupBy(
-        col("t.fund_account_id"),
-        col("a.oa_branch_id"),
-        col("a.client_type")
     ).select(
-        "t.fund_account_id",
-        "a.oa_branch_id",
-        "a.client_type"
+        col("t.fund_account_id").alias("fund_account_id"),
+        col("a.oa_branch_id").alias("oa_branch_id"),
+        col("a.client_type").alias("client_type")
+    ).dropDuplicates(
+        ["fund_account_id",
+            "oa_branch_id",
+            "client_type"]
     )
 
     tmp2 = tmp1.alias("t") \
@@ -445,9 +481,27 @@ def p_cockpit_00092_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite"
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
     """
     净贡献总和（万）
     """
+    logger.info("开始计算净贡献总和")
+
 
     tmp1 = df_jgx.alias("t") \
         .join(
@@ -503,9 +557,27 @@ def p_cockpit_00092_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
     """
     单客户平均贡献值
     """
+    logger.info("开始计算单客户平均贡献值")
+
 
     df_92_y = df_92_y.alias("a") \
         .withColumn(
@@ -531,13 +603,14 @@ def p_cockpit_00092_data(spark, busi_date):
     """
     两年千万工程客户数
     """
+    logger.info("开始计算两年千万工程客户数")
 
     # 本年度符合标准千万工程客户数
     tmp = df_qw.alias("t") \
         .groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("QW_CLIENT_NUM_ALL")
+        count(lit("1")).alias("QW_CLIENT_NUM_ALL")
     ).select(
         "t.oa_branch_id",
         "QW_CLIENT_NUM_ALL"
@@ -554,7 +627,7 @@ def p_cockpit_00092_data(spark, busi_date):
     ).groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("QW_CLIENT_NUM_ALL_LAST")
+        count(lit("1")).alias("QW_CLIENT_NUM_1")
     ).select(
         "t.oa_branch_id",
         "QW_CLIENT_NUM_1"
@@ -573,7 +646,7 @@ def p_cockpit_00092_data(spark, busi_date):
     ).groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("QW_CLIENT_NUM_2")
+        count(lit("1")).alias("QW_CLIENT_NUM_2")
     ).select(
         "t.oa_branch_id",
         "QW_CLIENT_NUM_2"
@@ -592,7 +665,7 @@ def p_cockpit_00092_data(spark, busi_date):
     ).groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("QW_CLIENT_NUM_3")
+        count(lit("1")).alias("QW_CLIENT_NUM_3")
     ).select(
         "t.oa_branch_id",
         "QW_CLIENT_NUM_3"
@@ -611,7 +684,7 @@ def p_cockpit_00092_data(spark, busi_date):
     ).groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("QW_CLIENT_NUM_4")
+        count(lit("1")).alias("QW_CLIENT_NUM_4")
     ).select(
         "t.oa_branch_id",
         "QW_CLIENT_NUM_4"
@@ -676,7 +749,7 @@ def p_cockpit_00092_data(spark, busi_date):
     df_92_y = update_dataframe(
         df_to_update=df_92_y,
         df_use_me=df_y,
-        join_columns=["busi_year", "oa_branch_id"],
+        join_columns=["oa_branch_id"],
         update_columns=[
             "QW_CLIENT_NUM_1",
             "QW_CLIENT_NUM_1_RATE",
@@ -690,9 +763,27 @@ def p_cockpit_00092_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
     """
     两年千万工程客户净贡献
     """
+    logger.info("开始计算两年千万工程客户净贡献")
+
 
     # 本年度符合标准千万工程
     tmp = df_qw.alias("t") \
@@ -878,7 +969,7 @@ def p_cockpit_00092_data(spark, busi_date):
     df_92_y = update_dataframe(
         df_to_update=df_92_y,
         df_use_me=df_y,
-        join_columns=["busi_year", "oa_branch_id"],
+        join_columns=["oa_branch_id"],
         update_columns=[
             "QW_CLEAR_TRANSFEE_1",
             "QW_CLEAR_TRANSFEE_1_RATE",
@@ -892,9 +983,27 @@ def p_cockpit_00092_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
     """
     户均贡献值（万）
     """
+    logger.info("开始计算户均贡献值")
+
     # TODO: 以下代码需要核实逻辑
     df_92_y = df_92_y.alias("a") \
         .withColumn(
@@ -926,13 +1035,16 @@ def p_cockpit_00092_data(spark, busi_date):
     """
     流失客户数
     """
+    logger.info("开始计算流失客户数")
 
+
+    # TODO 下面这段代码空跑执行花了7min，需要优化
     # 上年度符合标准的客户数
     tmp = df_qw_last.alias("t") \
         .groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("LOSE_CLIENT_NUM1")
+        count(lit("1")).alias("LOSE_CLIENT_NUM1")
     ).select(
         "t.oa_branch_id",
         "LOSE_CLIENT_NUM1"
@@ -949,7 +1061,7 @@ def p_cockpit_00092_data(spark, busi_date):
     ).groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("LOSE_CLIENT_NUM2")
+        count(lit("1")).alias("LOSE_CLIENT_NUM2")
     ).select(
         "t.oa_branch_id",
         "LOSE_CLIENT_NUM2"
@@ -966,7 +1078,7 @@ def p_cockpit_00092_data(spark, busi_date):
     ).groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("LOSE_CLIENT_NUM4")
+        count(lit("1")).alias("LOSE_CLIENT_NUM4")
     ).select(
         "t.oa_branch_id",
         "LOSE_CLIENT_NUM4"
@@ -1009,7 +1121,7 @@ def p_cockpit_00092_data(spark, busi_date):
     df_92_y = update_dataframe(
         df_to_update=df_92_y,
         df_use_me=df_y,
-        join_columns=["busi_year", "oa_branch_id"],
+        join_columns=["oa_branch_id"],
         update_columns=[
             "LOSE_CLIENT_NUM1",
             "LOSE_CLIENT_NUM2",
@@ -1019,10 +1131,28 @@ def p_cockpit_00092_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
     """
     流失客户数-净贡献
     """
+    logger.info("开始计算流失客户数-净贡献")
 
+    # TODO 下面这段空跑半小时都不动，需要优化
     # 流失客户数-上年度符合客户净贡献
     tmp = df_qw_last.alias("t") \
         .join(
@@ -1070,9 +1200,15 @@ def p_cockpit_00092_data(spark, busi_date):
     # 上年度符合，本年度不符合总数
     tmp2 = df_qw_last.alias("t") \
         .join(
-        other=df_qw.alias("a"),
+        other=df_jgx_last.alias("a"),
         on=(
-                col("t.fund_account_id") == col("a.fund_account_id")
+                col("t.fund_account_id") == col("a.client_id")
+        ),
+        how="inner"
+    ).join(
+        other=df_qw.alias("b"),
+        on=(
+                (col("t.fund_account_id") == col("b.fund_account_id"))
         ),
         how="left_anti"
     ).groupBy(
@@ -1123,7 +1259,7 @@ def p_cockpit_00092_data(spark, busi_date):
     df_92_y = update_dataframe(
         df_to_update=df_92_y,
         df_use_me=df_y,
-        join_columns=["busi_year", "oa_branch_id"],
+        join_columns=["oa_branch_id"],
         update_columns=[
             "LOSE_CLIENT_NUM6",
             "LOSE_CLIENT_NUM7",
@@ -1133,19 +1269,37 @@ def p_cockpit_00092_data(spark, busi_date):
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
+
     """
     流失客户数-本年全客户平均净贡献增长率
     "200个客户在2022年的净贡献，除以，200；假设为A
     180个客户在2021年的净贡献，除以，180；假设为B
     结果为：A/B—1
     """
+    logger.info("开始计算流失客户数-本年全客户平均净贡献增长率")
 
     # 本年客户数
     tmp = df_qw.alias("t") \
         .groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("client_num")
+        count(lit("1")).alias("client_num")
     ).select(
         "t.oa_branch_id",
         "client_num"
@@ -1191,7 +1345,7 @@ def p_cockpit_00092_data(spark, busi_date):
         .groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("client_num")
+        count(lit("1")).alias("client_num")
     ).select(
         "t.oa_branch_id",
         "client_num"
@@ -1256,11 +1410,27 @@ def p_cockpit_00092_data(spark, busi_date):
     df_92_y = update_dataframe(
         df_to_update=df_92_y,
         df_use_me=df_y,
-        join_columns=["busi_year", "oa_branch_id"],
+        join_columns=["oa_branch_id"],
         update_columns=[
             "LOSE_CLIENT_NUM11",
         ]
     )
+
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
 
     """
     流失客户数-本年未流失客户平均净贡献增长率
@@ -1268,6 +1438,7 @@ def p_cockpit_00092_data(spark, busi_date):
     150个客户在2021年的净贡献，除以，150；假设为D
     结果为：C/D—1"
     """
+    logger.info("开始计算流失客户数-本年未流失客户平均净贡献增长率")
 
     # 本年和上年同时千万工程
     tmp = df_qw.alias("t") \
@@ -1277,20 +1448,17 @@ def p_cockpit_00092_data(spark, busi_date):
                 col("t.fund_account_id") == col("a.fund_account_id")
         ),
         how="inner"
-    ).groupBy(
-        col("t.fund_account_id"),
-        col("t.oa_branch_id")
     ).select(
-        "t.fund_account_id",
-        "t.oa_branch_id"
-    )
+        col("t.fund_account_id").alias("fund_account_id"),
+        col("t.oa_branch_id").alias("oa_branch_id")
+    ).drop_duplicates()
 
     # 客户数
     tmp1 = tmp.alias("t") \
         .groupBy(
         col("t.oa_branch_id")
     ).agg(
-        count("1").alias("client_num")
+        count(lit("1")).alias("client_num")
     ).select(
         "t.oa_branch_id",
         "client_num"
@@ -1390,35 +1558,50 @@ def p_cockpit_00092_data(spark, busi_date):
     df_92_y = update_dataframe(
         df_to_update=df_92_y,
         df_use_me=df_y,
-        join_columns=["busi_year", "oa_branch_id"],
+        join_columns=["oa_branch_id"],
         update_columns=[
             "LOSE_CLIENT_NUM12",
         ]
     )
 
+    return_to_hive(
+        spark=spark,
+        df_result=df_92_y,
+        target_table="ddw.T_BRP_00092",
+        insert_mode="overwrite",
+    )
+
+    logger.info("ddw.T_BRP_00092[初始化数据],写入完成")
+
+    df_92_y = spark.table("ddw.T_BRP_00092") \
+        .filter(
+        col("busi_year") == lit(v_busi_year)
+    )
+
+    logger.info("ddw.T_BRP_00092[本年分区]重新加载完成")
+
     """
     流失客户数-增创净贡献
     150个客户在2022年的净贡献，减去，150个客户在2021年的净贡献
     """
+    logger.info("开始计算流失客户数-增创净贡献")
+
 
     # 本年和上年同时千万工程
-    tmp = df_qw.alias("t") \
-        .join(
+    tmp = df_qw.alias("t").join(
         other=df_qw_last.alias("a"),
         on=(
                 col("t.fund_account_id") == col("a.fund_account_id")
         ),
         how="inner"
-    ).groupBy(
-        col("t.fund_account_id"),
-        col("t.oa_branch_id")
     ).select(
-        "t.fund_account_id",
-        "t.oa_branch_id"
-    )
+        col("t.fund_account_id").alias("fund_account_id"),
+        col("t.oa_branch_id").alias("oa_branch_id")
+    ).drop_duplicates()
+
 
     # 当年净贡献
-    tmp1 = tmp.alias("t") \
+    tmp2 = tmp.alias("t") \
         .join(
         other=df_jgx.alias("a"),
         on=(
@@ -1437,7 +1620,7 @@ def p_cockpit_00092_data(spark, busi_date):
     )
 
     # 上一年净贡献
-    tmp2 = tmp.alias("t") \
+    tmp3 = tmp.alias("t") \
         .join(
         other=df_jgx_last.alias("a"),
         on=(
@@ -1471,14 +1654,14 @@ def p_cockpit_00092_data(spark, busi_date):
     ).select(
         col("t.oa_branch_id"),
         (
-            coalesce(col("a.jgx_sum"), lit(0)) - coalesce(col("b.jgx_sum"), lit(0))
+                coalesce(col("a.jgx_sum"), lit(0)) - coalesce(col("b.jgx_sum"), lit(0))
         ).alias("LOSE_CLIENT_NUM13")
     )
 
     df_92_y = update_dataframe(
         df_to_update=df_92_y,
         df_use_me=df_y,
-        join_columns=["busi_year", "oa_branch_id"],
+        join_columns=["oa_branch_id"],
         update_columns=[
             "LOSE_CLIENT_NUM13",
         ]
@@ -1489,6 +1672,4 @@ def p_cockpit_00092_data(spark, busi_date):
         df_result=df_92_y,
         target_table="ddw.t_brp_00092",
         insert_mode="overwrite",
-        partition_column=["busi_year"],
-        partition_value=v_busi_year
     )
