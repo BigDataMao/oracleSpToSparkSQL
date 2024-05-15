@@ -1,17 +1,22 @@
 # -*- coding: utf-8 -*-
-"""
-经营分析-分管部门-成交品种排名落地
-"""
-
+import logging
 from pyspark.sql.functions import sum, desc, row_number
 from pyspark.sql.window import Window
 
 from utils.date_utils import get_date_period_and_days
 from utils.task_env import *
 
+logger = logging.getLogger("logger")
+
 
 @log
 def p_cockpit_bu_anal_resp_top_pd(spark, busi_date):
+    """
+    经营分析-分管部门-成交品种排名落地
+    :param spark: SparkSession对象
+    :param busi_date: 业务日期,格式为"YYYYMMDD"
+    :return: None
+    """
     i_month_id = busi_date[:6]
     (
         v_being_date,
@@ -45,9 +50,9 @@ def p_cockpit_bu_anal_resp_top_pd(spark, busi_date):
     ).join(
         other=df_product.alias("d"),
         on=(
-                col("t.product_id") == col("d.product_id") &
-                col("t.market_id") == col("d.market_id") &
-                col("t.trade_type") == col("d.trade_type")
+                (col("t.product_id") == col("d.product_id")) &
+                (col("t.market_id") == col("d.market_id")) &
+                (col("t.trade_type") == col("d.trade_type"))
         ),
         how="left"
     ).join(
@@ -57,9 +62,9 @@ def p_cockpit_bu_anal_resp_top_pd(spark, busi_date):
         ),
         how="left"
     ).filter(
-        col("t.busi_date").between(lit(v_being_date), lit(v_end_date)) &
-        col("c.oa_branch_id").isNotNull() &
-        col("e.business_line_id").isNotNull()
+        (col("t.busi_date").between(lit(v_being_date), lit(v_end_date))) &
+        (col("c.oa_branch_id").isNotNull()) &
+        (col("e.business_line_id").isNotNull())
     ).groupBy(
         col("t.product_id"),
         col("d.product_name"),
@@ -70,7 +75,9 @@ def p_cockpit_bu_anal_resp_top_pd(spark, busi_date):
     ).select(
         col("t.product_id"),
         col("d.product_name"),
-        col("e.respons_line_id")
+        col("e.respons_line_id"),
+        col("done_amount"),
+        col("done_money")
     ).alias("df_tmp")
 
     df_tmp1 = df_tmp.alias("t") \
@@ -106,9 +113,5 @@ def p_cockpit_bu_anal_resp_top_pd(spark, busi_date):
         spark=spark,
         df_result=df_y,
         target_table="ddw.t_cockpit_bu_anal_resp_top_pd",
-        insert_mode="overwrite",
-        partition_column=["busi_month"],
-        partition_value=[i_month_id]
+        insert_mode="overwrite"
     )
-
-    logging.info("ddw.t_cockpit_bu_anal_resp_top_pd写入完成")
