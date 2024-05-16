@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
 import datetime
 import functools
-import inspect
 import logging
-import sys
-import traceback
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, col, coalesce, expr, when
 
 from utils.io_utils.common_uitls import to_color_str
+from config import *
+from utils.io_utils.path_utils import get_project_path
 
 logger = logging.getLogger("logger")
+config = Config(get_project_path() + "/config.json")
+log_config = config.get("log_config")
+if_count = log_config.get("if_count")
 
 
 # spark入口
@@ -119,8 +121,9 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
 
     logger.info("目标表为: %s", target_table)
     # 记录df_result中的总条数
-    logger.info("正在查询df_result中的总条数......")
-    logger.info("本次写入总条数: %s", df_result.count())
+    if if_count:
+        logger.info("正在查询df_result中的总条数......")
+        logger.info("本次写入总条数: %s", df_result.count())
     # 插入数据
     df_result.select(target_columns).write.insertInto(target_table, overwrite=if_overwrite)
     logger.info("数据已写入表: %s", target_table)
@@ -136,6 +139,7 @@ def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filt
     :param filter_condition: 过滤条件,为str,会被expr()处理, 其中的列名需要加上"a."或"b."
     :return: DataFrame
     """
+
     df_to_update = df_to_update.alias("a")
     df_use_me = df_use_me.alias("b")
     join_condition = " and ".join(["a.{} = b.{}".format(column, column) for column in join_columns])
@@ -148,15 +152,17 @@ def update_dataframe(df_to_update, df_use_me, join_columns, update_columns, filt
             when(
                 expr(join_condition) &
                 expr(filter_condition) if filter_condition else lit(True),
-                coalesce(df_use_me[column], df_to_update[column])
+                coalesce(col("b." + column), col("a." + column))
             ).otherwise(col("a." + column))
         )
         df_result = df_result.drop(column)
         df_result = df_result.withColumnRenamed(new_col_name, column)
 
-    # 删除df_result中属于df2的列
-    for column in df_use_me.columns:
-        df_result = df_result.drop(col("b." + column))
+    # 提取出原属于df_to_update的列
+    df_result = df_result.select(
+        [col("a.*")] +
+        [col(c) for c in update_columns]
+    )
 
     return df_result
 
