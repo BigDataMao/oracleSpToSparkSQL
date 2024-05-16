@@ -130,7 +130,7 @@ def generate_hive_ddl(table_info: dict, type_mapping: Tuple[str,str]):
                 tmp_ddl = tmp_ddl + ",\n" + "\t" + name.ljust(adjust_len) + "\t" + name_type
 
     hive_ddl = \
-        f"""CREATE TABLE IF NOT EXISTS {table_info.get('hive_table_fullname')}(\n{tmp_ddl})\n{partition_ddl}
+        f"""CREATE TABLE IF NOT EXISTS `{table_info.get('hive_table_fullname')}`(\n{tmp_ddl})\n{partition_ddl}
         """
     return hive_ddl
 
