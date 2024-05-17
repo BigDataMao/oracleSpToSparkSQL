@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-
 from pyspark.sql.functions import col, lit, sum, when, substring, regexp_replace, round, udf, date_format, date_add, \
-    to_date
+    to_date, max
 from pyspark.sql.types import StringType, BooleanType
 
-from utils.date_utils import *
-from utils.task_env import *
+from utils.date_utils import get_trade_date, is_trade_day_check, get_date_period_and_days, get_date_list
+from utils.io_utils.common_uitls import to_color_str
+from utils.task_env import return_to_hive, update_dataframe, logger, log
 
 
 @log
@@ -13,12 +13,11 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
     """
     资金对账表日和落地数据
     """
-    # 注册函数
-    # is_trade_day_check_udf = udf(lambda x: is_trade_day_check(list_pub_date, x), BooleanType())
+    # 注册函数 TODO 这里报错
     get_trade_date_udf = udf(lambda x, n: get_trade_date(list_pub_date, x, n), StringType())
 
     # 日期处理
-    if not is_trade_day_check(spark, i_begin_date):
+    if not is_trade_day_check(list_pub_date, i_begin_date):
         v_begin_date = get_trade_date(spark, i_begin_date, 1)
         v_begin_date_before = get_trade_date(spark, i_begin_date, -1)
     else:
@@ -27,10 +26,10 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
 
     v_end_date = i_end_date
 
-    if not is_trade_day_check(spark, i_end_date):
+    if not is_trade_day_check(list_pub_date, i_end_date):
         v_end_date = get_trade_date(spark, v_end_date, 0)
 
-    tmp_trade_date = spark.table("ddw.tmp_trade_date").alias("c") \
+    tmp_trade_date = spark.table("edw.t10_pub_date").alias("c") \
         .filter(
         (col("c.busi_date").between(i_begin_date, i_end_date)) &
         (col("c.market_no") == "1")
@@ -47,7 +46,7 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
         insert_mode="overwrite"
     )
 
-    logging.info("ddw.tmp_trade_date写入完成")
+    logger.info("ddw.tmp_trade_date写入完成")
 
     """
     取客户权限范围内的客户
@@ -66,10 +65,10 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
         max(col("a.fee")).alias("fee")
     ).select(
         when(col("fee").isNull(), 5.5).otherwise(col("fee")).alias("fee")
-    ).collect()[0][0] / 100000000
+    ).first()[0] / 100000000
 
     # 成交量，成交金额,平今成交量，平今成交额
-    df_hold_balance = spark.table("cf_sett.t_hold_balance").alias("a") \
+    df_hold_balance = spark.table("edw.h15_hold_balance").alias("a") \
         .filter(
         (col("a.busi_date").between(v_begin_date, v_end_date))
     ).groupBy(
@@ -101,11 +100,12 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
     )
 
     # 净留存手续费取德索数据
+    logger.info(to_color_str("净留存手续费取德索数据", "blue"))
 
-    df_clear_remain_transfee = spark.table("ods.T_DS_ADM$CUST_01").alias("a") \
+    df_clear_remain_transfee = spark.table("ods.T_DS_ADM_CUST_01").fillna(0).alias("a") \
         .filter(
         (regexp_replace(col("a.tx_dt"), pattern="-", replacement="").between(v_begin_date, v_end_date))
-    ).fillna(0).groupBy(
+    ).groupBy(
         regexp_replace(col("a.tx_dt"), pattern="-", replacement="").alias("busi_date"),
         col("a.investor_id").alias("fund_account_id")
     ).agg(
@@ -149,30 +149,29 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
         (col("a.busi_date").between(v_begin_date_before, v_end_date))
     )
 
-    tmp = t_1.alias("a") \
+    tmp = t_1.fillna(0).alias("a") \
         .join(
-        other=tmp_trade_date.alias("b"),
+        other=tmp_trade_date.fillna(0).alias("b"),
         on=(
                 col("a.busi_date") == col("b.trade_date")
         ),
         how="inner"
     ).join(
-        other=df_hold_balance.alias("d"),
+        other=df_hold_balance.fillna(0).alias("d"),
         on=(
-                col("a.busi_date") == col("d.busi_date") &
-                col("a.fund_account_id") == col("d.fund_account_id") &
-                col("a.money_type") == col("d.money_type")
+                (col("a.busi_date") == col("d.busi_date")) &
+                (col("a.fund_account_id") == col("d.fund_account_id")) &
+                (col("a.money_type") == col("d.money_type"))
         ),
         how="left"
     ).join(
-        other=df_clear_remain_transfee.alias("e"),
+        other=df_clear_remain_transfee.fillna(0).alias("e"),
         on=(
-                col("a.busi_date") == col("e.busi_date") &
-                col("a.fund_account_id") == col("e.fund_account_id")
+                (col("a.busi_date") == col("e.busi_date")) &
+                (col("a.fund_account_id") == col("e.fund_account_id"))
         ),
         how="left"
-    ).fillna(0) \
-        .select(
+    ).select(
         col("b.n_busi_date"),
         col("b.trade_flag"),
         col("a.busi_date"),
@@ -181,58 +180,58 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
         col("a.fund_account_id"),
         col("a.sett_type"),
         col("a.money_type"),
-        col("a.yes_rights") * col("b.trade_flag").alias("yes_rights"),
-        col("a.fund_in") * col("b.trade_flag").alias("fund_in"),
-        col("a.strikeactreceivsum") * col("b.trade_flag").alias("strikeactreceivsum"),
-        col("a.fund_out") * col("b.trade_flag").alias("fund_out"),
-        col("a.strikeactpaysum") * col("b.trade_flag").alias("strikeactpaysum"),
-        col("a.fund_impawn_in") * col("b.trade_flag").alias("fund_impawn_in"),
-        col("a.fund_impawn_out") * col("b.trade_flag").alias("fund_impawn_out"),
-        col("a.lastfundmortgagein") * col("b.trade_flag").alias("lastfundmortgagein"),
-        col("a.lastfundmortgageout") * col("b.trade_flag").alias("lastfundmortgageout"),
+        (col("a.yes_rights") * col("b.trade_flag")).alias("yes_rights"),
+        (col("a.fund_in") * col("b.trade_flag")).alias("fund_in"),
+        (col("a.strikeactreceivsum") * col("b.trade_flag")).alias("strikeactreceivsum"),
+        (col("a.fund_out") * col("b.trade_flag")).alias("fund_out"),
+        (col("a.strikeactpaysum") * col("b.trade_flag")).alias("strikeactpaysum"),
+        (col("a.fund_impawn_in") * col("b.trade_flag")).alias("fund_impawn_in"),
+        (col("a.fund_impawn_out") * col("b.trade_flag")).alias("fund_impawn_out"),
+        (col("a.lastfundmortgagein") * col("b.trade_flag")).alias("lastfundmortgagein"),
+        (col("a.lastfundmortgageout") * col("b.trade_flag")).alias("lastfundmortgageout"),
         col("a.impawn_money"),
-        col("a.impawn_money") * col("b.trade_flag").alias("end_impawn_money"),
-        col("a.yes_impawn_money") * col("b.trade_flag").alias("yes_impawn_money"),
-        col("a.opt_premium_income") * col("b.trade_flag").alias("opt_premium_income"),
-        col("a.opt_premium_pay") * col("b.trade_flag").alias("opt_premium_pay"),
-        col("a.transfee") * col("b.trade_flag").alias("transfee"),
-        col("a.delivery_transfee") * col("b.trade_flag").alias("delivery_transfee"),
-        col("a.strikefee") * col("b.trade_flag").alias("strikefee"),
-        col("a.performfee") * col("b.trade_flag").alias("performfee"),
-        col("a.market_transfee") * col("b.trade_flag").alias("market_transfee"),
-        col("a.market_delivery_transfee") * col("b.trade_flag").alias("market_delivery_transfee"),
-        col("a.market_strikefee") * col("b.trade_flag").alias("market_strikefee"),
-        col("a.market_performfee") * col("b.trade_flag").alias("market_performfee"),
-        col("a.today_profit") * col("b.trade_flag").alias("today_profit"),
-        col("a.hold_profit") * col("b.trade_flag").alias("hold_profit"),
-        col("a.hold_profit_f") * col("b.trade_flag").alias("hold_profit_f"),
-        col("a.close_profit") * col("b.trade_flag").alias("close_profit"),
-        col("a.drop_profit_f") * col("b.trade_flag").alias("drop_profit_f"),
+        (col("a.impawn_money") * col("b.trade_flag")).alias("end_impawn_money"),
+        (col("a.yes_impawn_money") * col("b.trade_flag")).alias("yes_impawn_money"),
+        (col("a.opt_premium_income") * col("b.trade_flag")).alias("opt_premium_income"),
+        (col("a.opt_premium_pay") * col("b.trade_flag")).alias("opt_premium_pay"),
+        (col("a.transfee") * col("b.trade_flag")).alias("transfee"),
+        (col("a.delivery_transfee") * col("b.trade_flag")).alias("delivery_transfee"),
+        (col("a.strikefee") * col("b.trade_flag")).alias("strikefee"),
+        (col("a.performfee") * col("b.trade_flag")).alias("performfee"),
+        (col("a.market_transfee") * col("b.trade_flag")).alias("market_transfee"),
+        (col("a.market_delivery_transfee") * col("b.trade_flag")).alias("market_delivery_transfee"),
+        (col("a.market_strikefee") * col("b.trade_flag")).alias("market_strikefee"),
+        (col("a.market_performfee") * col("b.trade_flag")).alias("market_performfee"),
+        (col("a.today_profit") * col("b.trade_flag")).alias("today_profit"),
+        (col("a.hold_profit") * col("b.trade_flag")).alias("hold_profit"),
+        (col("a.hold_profit_f") * col("b.trade_flag")).alias("hold_profit_f"),
+        (col("a.close_profit") * col("b.trade_flag")).alias("close_profit"),
+        (col("a.drop_profit_f") * col("b.trade_flag")).alias("drop_profit_f"),
         col("a.rights"),
-        col("a.rights") * col("b.trade_flag").alias("end_rights"),
-        col("a.fund_impawn_margin") * col("b.trade_flag").alias("fund_impawn_margin"),
+        (col("a.rights") * col("b.trade_flag")).alias("end_rights"),
+        (col("a.fund_impawn_margin") * col("b.trade_flag")).alias("fund_impawn_margin"),
         col("a.open_pre_money"),
-        col("a.open_pre_money") * col("b.trade_flag").alias("end_open_pre_money"),
-        col("a.socrt_openfee") * col("b.trade_flag").alias("socrt_openfee"),
-        col("a.settlementfee") * col("b.trade_flag").alias("settlementfee"),
-        col("a.buy_opt_market_value") * col("b.trade_flag").alias("buy_opt_market_value"),
-        col("a.sell_opt_market_value") * col("b.trade_flag").alias("sell_opt_market_value"),
-        col("a.market_deposit") * col("b.trade_flag").alias("market_deposit"),
-        col("a.optstrike_profit") * col("b.trade_flag").alias("optstrike_profit"),
-        col("a.margin") * col("b.trade_flag").alias("margin"),
-        col("a.market_margin") * col("b.trade_flag").alias("market_margin"),
-        col("a.strike_credit") * col("b.trade_flag").alias("strike_credit"),
-        col("a.credit") * col("b.trade_flag").alias("credit"),
-        col("d.done_amount") * col("b.trade_flag").alias("done_amount"),
-        col("d.done_money") * col("b.trade_flag").alias("done_money"),
-        col("a.execute_transfee") * col("b.trade_flag").alias("execute_transfee"),
-        col("a.market_execute_transfee") * col("b.trade_flag").alias("market_execute_transfee"),
-        (col("a.rights") - col("a.market_margin")) * col("b.trade_flag").alias("market_open_pre_money"),
-        col("d.done_amount_pj") * col("b.trade_flag").alias("done_amount_pj"),
-        col("d.done_money_pj") * col("b.trade_flag").alias("done_money_pj"),
-        col("a.add_fee1") * col("b.trade_flag").alias("add_fee1"),
-        col("a.add_fee2") * col("b.trade_flag").alias("add_fee2"),
-        col("e.clear_remain_transfee") * col("b.trade_flag").alias("clear_remain_transfee")
+        (col("a.open_pre_money") * col("b.trade_flag")).alias("end_open_pre_money"),
+        (col("a.socrt_openfee") * col("b.trade_flag")).alias("socrt_openfee"),
+        (col("a.settlementfee") * col("b.trade_flag")).alias("settlementfee"),
+        (col("a.buy_opt_market_value") * col("b.trade_flag")).alias("buy_opt_market_value"),
+        (col("a.sell_opt_market_value") * col("b.trade_flag")).alias("sell_opt_market_value"),
+        (col("a.market_deposit") * col("b.trade_flag")).alias("market_deposit"),
+        (col("a.optstrike_profit") * col("b.trade_flag")).alias("optstrike_profit"),
+        (col("a.margin") * col("b.trade_flag")).alias("margin"),
+        (col("a.market_margin") * col("b.trade_flag")).alias("market_margin"),
+        (col("a.strike_credit") * col("b.trade_flag")).alias("strike_credit"),
+        (col("a.credit") * col("b.trade_flag")).alias("credit"),
+        (col("d.done_amount") * col("b.trade_flag")).alias("done_amount"),
+        (col("d.done_money") * col("b.trade_flag")).alias("done_money"),
+        (col("a.execute_transfee") * col("b.trade_flag")).alias("execute_transfee"),
+        (col("a.market_execute_transfee") * col("b.trade_flag")).alias("market_execute_transfee"),
+        ((col("a.rights") - col("a.market_margin")) * col("b.trade_flag")).alias("market_open_pre_money"),
+        (col("d.done_amount_pj") * col("b.trade_flag")).alias("done_amount_pj"),
+        (col("d.done_money_pj") * col("b.trade_flag")).alias("done_money_pj"),
+        (col("a.add_fee1") * col("b.trade_flag")).alias("add_fee1"),
+        (col("a.add_fee2") * col("b.trade_flag")).alias("add_fee2"),
+        (col("e.clear_remain_transfee") * col("b.trade_flag")).alias("clear_remain_transfee")
     )
 
     df_tmp_brp_06008_rpt1 = tmp.alias("a") \
@@ -343,9 +342,10 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
         sum(col("a.transfee") + col("a.delivery_transfee") + col("a.strikefee")).alias("transfee"),
         sum(col("a.market_transfee") + col("a.market_delivery_transfee") + col("a.market_strikefee")).alias(
             "market_transfee"),
-        (sum(col("a.transfee") + col("a.delivery_transfee") + col("a.strikefee")) -
-         sum(col("a.market_transfee") + col("a.market_delivery_transfee") + col("a.market_strikefee"))).alias(
-            "remain_transfee"),
+        (
+            sum(col("a.transfee") + col("a.delivery_transfee") + col("a.strikefee")) -
+            sum(col("a.market_transfee") + col("a.market_delivery_transfee") + col("a.market_strikefee"))
+        ).alias("remain_transfee"),
         sum(col("a.done_money") * lit(v_dratio)).alias("bzjj"),
         sum(col("a.today_profit")).alias("today_profit"),
         sum(col("a.hold_profit")).alias("hold_profit_d"),
@@ -358,7 +358,7 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
         sum(col("a.fund_impawn_margin")).alias("fund_impawn_margin"),
         sum(col("a.delivery_transfee")).alias("delivery_transfee"),
         sum(col("a.market_delivery_transfee")).alias("market_delivery_transfee"),
-        sum(col("a.jingshoufei")).alias("jingshoufei"),
+        sum(col("a.socrt_openfee")).alias("jingshoufei"),
         sum(col("a.settlementfee")).alias("jiesuanfei"),
         sum(col("a.buy_opt_market_value")).alias("buy_opt_market_value"),
         sum(col("a.sell_opt_market_value")).alias("sell_opt_market_value"),
@@ -405,11 +405,12 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
     return_to_hive(
         spark=spark,
         df_result=df_TMP_06008_1,
-        target_table="cf_busimg.TMP_06008_1",
+        target_table="ddw.TMP_06008_1",
         insert_mode="overwrite"
     )
 
     # 更新自然日的yes_rights
+    logger.info(to_color_str("更新自然日的yes_rights", "blue"))
     df_y = df_TMP_06008_1.alias("b") \
         .select(
         col("b.n_busi_date"),
