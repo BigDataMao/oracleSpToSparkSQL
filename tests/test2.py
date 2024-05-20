@@ -29,6 +29,3 @@ data = spark.table("edw.h11_market").rdd
 # 创建 DataFrame 并赋予 schema
 df = spark.createDataFrame(data, schema)
 
-# 检查 DataFrame
-df.printSchema()
-df.select(df.exchange_id, df.market_name).show(5)
