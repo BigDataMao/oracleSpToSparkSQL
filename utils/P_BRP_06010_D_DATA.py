@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 
-from pyspark.sql.functions import sum, concat, substring, length, regexp_extract
+from pyspark.sql.functions import sum, concat, substring, length, regexp_extract, when, coalesce, udf
+from pyspark.sql.types import StringType
 
 from utils.date_utils import *
-from utils.task_env import *
+from utils.task_env import log, return_to_hive, update_dataframe
 
 
 @log
-def p_brp_06010_d_data(spark, busi_date):
+def p_brp_06010_d_data(spark, list_pub_date, busi_date):
     """
     交易统计表-日和阶段
     """
+
+    get_trade_date_udf = udf(lambda x, n: get_trade_date(list_pub_date, x, n), StringType())
 
     v_begin_date = busi_date
     v_end_date = busi_date
@@ -99,27 +102,48 @@ def p_brp_06010_d_data(spark, busi_date):
         sum(
             when(col("a.busi_date") == v_end_trade_date, col("a.market_margin")).otherwise(0)
         ).alias("market_margin")
+    ).select(
+        col("busi_date_during"),
+        col("client_id"),
+        col("branch_id"),
+        col("FUND_ACCOUNT_ID"),
+        col("money_type"),
+        col("trade_type"),
+        col("trade_prop"),
+        col("market_id"),
+        col("product_id"),
+        col("security_id"),
+        col("delivery_date").alias("deliv_date"),
+        col("hold_amount"),
+        col("hold_money"),
+        col("hold_amount_avg"),
+        col("hold_profit_bydate"),
+        col("hold_profit_bytrade"),
+        col("buy_hold_money_qq"),
+        col("sell_hold_money_qq"),
+        col("margin"),
+        col("market_margin")
     )
 
     return_to_hive(
         spark=spark,
         df_result=df_tmp_brp_06010_hold,
-        target_table="cf_busimg.tmp_brp_06010_hold",
+        target_table="ddw.tmp_brp_06010_hold",
         insert_mode="overwrite"
     )
 
-    df_tmp_brp_06010_hold_fee = spark.table("edw.h15_hold_balance").alias("a") \
+    df_tmp_brp_06010_hold_fee = spark.table("edw.h15_hold_balance").fillna(0).alias("a") \
         .filter(
         col("a.busi_date").between(v_begin_trade_date, v_end_trade_date)
     ).join(
-        spark.table("edw.h12_fund_account").alias("b"),
+        spark.table("edw.h12_fund_account").fillna(0).alias("b"),
         col("a.fund_account_id") == col("b.fund_account_id"),
         "inner"
     ).join(
-        spark.table("edw.h17_security").alias("d"),
+        spark.table("edw.h17_security").fillna(0).alias("d"),
         col("a.security_id") == col("d.security_id"),
         "inner"
-    ).fillna(0).groupBy(
+    ).groupBy(
         col("a.busi_date").alias("busi_date_during"),
         col("a.client_id"),
         col("a.branch_id"),
@@ -198,6 +222,43 @@ def p_brp_06010_d_data(spark, busi_date):
         sum(col("a.done_amt")).alias("done_amt"),
         sum(col("a.done_sum")).alias("done_money_avg"),
         sum(col("a.done_amt")).alias("done_amount_avg")
+    ).select(
+        col("busi_date_during"),
+        col("client_id"),
+        col("branch_id"),
+        col("FUND_ACCOUNT_ID"),
+        col("money_type"),
+        col("trade_type"),
+        col("trade_prop"),
+        col("market_id"),
+        col("product_id"),
+        col("security_id"),
+        col("delivery_date").alias("deliv_date"),
+        col("transfee"),
+        col("market_transfee"),
+        col("margin"),
+        col("market_margin"),
+        col("total_profit"),
+        col("close_profit_bydate"),
+        col("close_profit_bytrade"),
+        col("hold_profit_bydate"),
+        col("hold_profit_bytrade"),
+        col("buy_hold_money_qq"),
+        col("sell_hold_money_qq"),
+        col("margin_tj"),
+        col("margin_tl"),
+        col("margin_tb"),
+        col("hold_amount_buy"),
+        col("hold_amount_sell"),
+        col("hold_amount"),
+        col("hold_money"),
+        col("hold_amount_avg"),
+        col("close_money_today"),
+        col("close_amount_today"),
+        col("done_sum"),
+        col("done_amt"),
+        col("done_money_avg"),
+        col("done_amount_avg")
     )
 
     return_to_hive(
@@ -207,18 +268,20 @@ def p_brp_06010_d_data(spark, busi_date):
         insert_mode="overwrite"
     )
 
-    df_tmp_brp_06010_done = spark.table("edw.h14_done").alias("a") \
+    df_tmp_brp_06010_hold_fee = spark.table("ddw.tmp_brp_06010_hold_fee")
+
+    df_tmp_brp_06010_done = spark.table("edw.h14_done").fillna(0).alias("a") \
         .filter(
         col("a.busi_date").between(v_begin_trade_date, v_end_trade_date)
     ).join(
-        other=spark.table("edw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").fillna(0).alias("b"),
         on=col("a.fund_account_id") == col("b.fund_account_id"),
         how="inner"
     ).join(
-        other=spark.table("edw.h17_security").alias("d"),
+        other=spark.table("edw.h17_security").fillna(0).alias("d"),
         on=col("a.security_id") == col("d.security_id"),
         how="inner"
-    ).fillna().groupBy(
+    ).groupBy(
         col("a.busi_date").alias("busi_date_during"),
         col("a.client_id"),
         col("a.branch_id"),
@@ -257,8 +320,8 @@ def p_brp_06010_d_data(spark, busi_date):
         ).alias("done_money_pj"),
         sum(col("a.done_amount")).alias("done_amount_avg"),
         sum(col("a.done_money")).alias("done_money_avg"),
-        sum(col("a.SOCRT_OPENFEE")).alias("JINGSHOUFEI"),
-        sum(col("a.SETTLEMENTFEE")).alias("JIESUANFEI"),
+        sum(col("a.SOCRT_OPENFEE")).alias("SOCRT_OPENFEE"),
+        sum(col("a.SETTLEMENTFEE")).alias("SETTLEMENTFEE"),
         sum(
             when(
                 (col("a.bs_direction") == "0") & (col("a.trade_type") != "11"),
@@ -282,6 +345,40 @@ def p_brp_06010_d_data(spark, busi_date):
         sum(
             when(col("a.force_flag") == "1", 1).otherwise(0)
         ).alias("force_number")
+    ).select(
+        col("busi_date_during"),
+        col("client_id"),
+        col("branch_id"),
+        col("FUND_ACCOUNT_ID"),
+        col("money_type"),
+        col("trade_type"),
+        col("trade_prop"),
+        col("market_id"),
+        col("product_id"),
+        col("security_id"),
+        col("delivery_date").alias("deliv_date"),
+        col("have_trade_num"),
+        col("transfee"),
+        col("market_transfee"),
+        col("remain_transfee"),
+        col("transfee_pj"),
+        col("market_transfee_pj"),
+        col("remain_transfee_pj"),
+        col("done_amount"),
+        col("done_amount_pj"),
+        col("done_money"),
+        col("done_money_pj"),
+        col("done_amount_avg"),
+        col("done_money_avg"),
+        col("SOCRT_OPENFEE"),
+        col("SETTLEMENTFEE"),
+        col("OPT_PREMIUM_PAY"),
+        col("OPT_PREMIUM_INCOME"),
+        col("add_fee1"),
+        col("add_fee2"),
+        col("done_amount_qp"),
+        col("done_money_qp"),
+        col("force_number")
     )
 
     return_to_hive(
@@ -291,30 +388,28 @@ def p_brp_06010_d_data(spark, busi_date):
         insert_mode="overwrite"
     )
 
+    df_tmp_brp_06010_done = spark.table("ddw.tmp_brp_06010_done")
+
     v_count = spark.table("edw.h14_delivery").alias("t") \
         .filter(
         (col("t.busi_date").between(v_begin_date, v_end_date)) &
         (col("t.data_source") == "CTP2")
     ).count()
 
-    df_tmp_brp_06010_deliv = spark.table("edw.h14_delivery").alias("a") \
+    # SQL源代码有if语句，这里用when代替
+    df_tmp_brp_06010_deliv = spark.table("edw.h14_delivery").fillna(0).alias("a") \
         .filter(
-        when(
-            v_count > 0,
-            (col("a.sett_date").between(v_begin_date, v_end_date))
-        ).otherwise(
-            (col("a.busi_date").between(v_begin_date, v_end_date))
-        )
+        col("a.sett_date").between(v_begin_date, v_end_date)
     ).join(
-        other=spark.table("edw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").fillna(0).alias("b"),
         on=col("a.fund_account_id") == col("b.fund_account_id"),
         how="inner"
     ).join(
-        other=spark.table("edw.h17_security").alias("d"),
+        other=spark.table("edw.h17_security").fillna(0).alias("d"),
         on=col("a.security_id") == col("d.security_id"),
         how="inner"
-    ).fillna(0).groupBy(
-        when(v_count > 0, col("a.sett_date")).otherwise(col("a.busi_date")).alias("busi_date_during"),
+    ).groupBy(
+        when(lit(v_count) > 0, col("a.sett_date")).otherwise(col("a.busi_date")).alias("busi_date_during"),
         col("a.client_id"),
         col("a.branch_id"),
         col("a.FUND_ACCOUNT_ID"),
@@ -355,6 +450,28 @@ def p_brp_06010_d_data(spark, busi_date):
                 col("a.margin")
             ).otherwise(0)
         ).alias("margin_tb")
+    ).select(
+        col("busi_date_during"),
+        col("client_id"),
+        col("branch_id"),
+        col("FUND_ACCOUNT_ID"),
+        col("money_type"),
+        col("trade_type"),
+        col("trade_prop"),
+        col("market_id"),
+        col("product_id"),
+        col("security_id"),
+        col("delivery_date").alias("deliv_date"),
+        col("transfee"),
+        col("market_transfee"),
+        col("remain_transfee"),
+        col("delivery_amount"),
+        col("done_amt"),
+        col("margin"),
+        col("market_margin"),
+        col("margin_tj"),
+        col("margin_tl"),
+        col("margin_tb")
     )
 
     return_to_hive(
@@ -364,20 +481,23 @@ def p_brp_06010_d_data(spark, busi_date):
         insert_mode="overwrite"
     )
 
-    df_tmp_brp_06010_execute = spark.table("edw.h14_delivery").alias("a") \
+    df_tmp_brp_06010_deliv = spark.table("ddw.tmp_brp_06010_deliv")
+
+    # TODO 这里SQL源代码把ddw.tmp_brp_06010_execute插了两遍,存疑(一遍overwrite,一遍append)
+    df_tmp_brp_06010_execute = spark.table("edw.h14_execute_result").fillna(0).alias("a") \
         .filter(
-        col("a.busi_date").between(v_begin_trade_date, v_end_trade_date) &
+        (col("a.busi_date").between(v_begin_date, v_end_date)) &
         (col("a.trade_type") == "12") &
         (col("a.strike_type") == "0")
     ).join(
-        other=spark.table("edw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").fillna(0).alias("b"),
         on=col("a.fund_account_id") == col("b.fund_account_id"),
         how="inner"
     ).join(
-        other=spark.table("edw.h17_security").alias("d"),
+        other=spark.table("edw.h17_security").fillna(0).alias("d"),
         on=col("a.security_id") == col("d.security_id"),
         how="inner"
-    ).fillna(0).groupBy(
+    ).groupBy(
         col("a.busi_date").alias("busi_date_during"),
         col("a.client_id"),
         col("a.branch_id"),
@@ -422,6 +542,30 @@ def p_brp_06010_d_data(spark, busi_date):
                 col("a.strike_qty") * col("a.strike_price") * col("a.hand_amount")
             ).otherwise(0)
         ).alias("strike_money_dq")
+    ).select(
+        col("busi_date_during"),
+        col("client_id"),
+        col("branch_id"),
+        col("FUND_ACCOUNT_ID"),
+        col("money_type"),
+        col("trade_type"),
+        col("trade_prop"),
+        col("market_id"),
+        col("product_id"),
+        col("security_id"),
+        col("delivery_date").alias("deliv_date"),
+        col("transfee"),
+        col("market_transfee"),
+        col("remain_transfee"),
+        col("transfee_xq"),
+        col("market_transfee_xq"),
+        col("transfee_ly"),
+        col("market_transfee_ly"),
+        col("strike_qty_xq"),
+        col("strike_qty_ly"),
+        col("optstrike_profit"),
+        col("strike_qty_dq"),
+        col("strike_money_dq")
     )
 
     return_to_hive(
@@ -431,19 +575,19 @@ def p_brp_06010_d_data(spark, busi_date):
         insert_mode="overwrite"
     )
 
-    df_tmp_brp_06010_execute_01 = spark.table("edw.h14_delivery").alias("a") \
+    df_tmp_brp_06010_execute_01 = spark.table("edw.h14_execute_result").fillna(0).alias("a") \
         .filter(
         col("a.busi_date").between(v_begin_trade_date, v_end_trade_date) &
         (col("a.trade_type") == "21")
     ).join(
-        other=spark.table("edw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").fillna(0).alias("b"),
         on=col("a.fund_account_id") == col("b.fund_account_id"),
         how="inner"
     ).join(
-        other=spark.table("edw.h17_security").alias("d"),
+        other=spark.table("edw.h17_security").fillna(0).alias("d"),
         on=col("a.security_id") == col("d.security_id"),
         how="inner"
-    ).fillna(0).groupBy(
+    ).groupBy(
         col("a.busi_date").alias("busi_date_during"),
         col("a.client_id"),
         col("a.branch_id"),
@@ -459,7 +603,7 @@ def p_brp_06010_d_data(spark, busi_date):
         sum(col("a.strikefee")).alias("transfee"),
         sum(col("a.market_strikefee")).alias("market_transfee"),
         sum(col("a.strikefee") - col("a.market_strikefee")).alias("remain_transfee"),
-        sum(
+        (sum(
             when(
                 col("a.bs_direction") == "0",
                 col("a.strikefee")
@@ -469,8 +613,8 @@ def p_brp_06010_d_data(spark, busi_date):
                 (col("a.bs_direction") == "1") & (col("a.market_id") == "CFFEX"),
                 col("a.strikefee")
             ).otherwise(0)
-        ).alias("transfee_xq"),
-        sum(
+        )).alias("transfee_xq"),
+        (sum(
             when(
                 (col("a.bs_direction") == "0"),
                 col("a.market_strikefee")
@@ -480,7 +624,7 @@ def p_brp_06010_d_data(spark, busi_date):
                 (col("a.bs_direction") == "1") & (col("a.market_id") == "CFFEX"),
                 col("a.market_strikefee")
             ).otherwise(0)
-        ).alias("market_transfee_xq"),
+        )).alias("market_transfee_xq"),
         sum(
             when(
                 (col("a.bs_direction") == "1") & (col("a.market_id") != "CFFEX"),
@@ -493,7 +637,7 @@ def p_brp_06010_d_data(spark, busi_date):
                 col("a.market_strikefee")
             ).otherwise(0)
         ).alias("market_transfee_ly"),
-        sum(
+        (sum(
             when(
                 (col("a.bs_direction") == "0"),
                 col("a.strike_qty")
@@ -503,7 +647,7 @@ def p_brp_06010_d_data(spark, busi_date):
                 (col("a.bs_direction") == "1") & (col("a.market_id") == "CFFEX"),
                 col("a.strike_qty")
             ).otherwise(0)
-        ).alias("strike_qty_xq"),
+        )).alias("strike_qty_xq"),
         sum(
             when(
                 (col("a.bs_direction") == "1") & (col("a.market_id") != "CFFEX"),
@@ -513,21 +657,45 @@ def p_brp_06010_d_data(spark, busi_date):
         sum(col("a.optstrike_profit")).alias("optstrike_profit"),
         lit(0).alias("strikefrozenmargin"),
         lit(0).alias("exchstrikefrozenmargin")
+    ).select(
+        get_trade_date_udf(col("busi_date_during"), lit(1)).alias("busi_date_during"),
+        col("a.client_id"),
+        col("a.branch_id"),
+        col("a.FUND_ACCOUNT_ID"),
+        col("a.money_type"),
+        col("a.trade_type"),
+        col("a.trade_prop"),
+        col("d.market_id"),
+        col("d.product_id"),
+        col("a.security_id"),
+        col("d.delivery_date").alias("deliv_date"),
+        col("transfee"),
+        col("market_transfee"),
+        col("remain_transfee"),
+        col("transfee_xq"),
+        col("market_transfee_xq"),
+        col("transfee_ly"),
+        col("market_transfee_ly"),
+        col("strike_qty_xq"),
+        col("strike_qty_ly"),
+        col("optstrike_profit"),
+        col("strikefrozenmargin"),
+        col("exchstrikefrozenmargin")
     )
 
-    df_tmp_brp_06010_execute_02 = spark.table("edw.h14_delivery").alias("a") \
+    df_tmp_brp_06010_execute_02 = spark.table("edw.h14_execute_result").fillna(0).alias("a") \
         .filter(
         col("a.busi_date").between(v_begin_trade_date, v_end_trade_date) &
         (col("a.trade_type") == "21")
     ).join(
-        other=spark.table("edw.h12_fund_account").alias("b"),
+        other=spark.table("edw.h12_fund_account").fillna(0).alias("b"),
         on=col("a.fund_account_id") == col("b.fund_account_id"),
         how="inner"
     ).join(
-        other=spark.table("edw.h17_security").alias("d"),
+        other=spark.table("edw.h17_security").fillna(0).alias("d"),
         on=col("a.security_id") == col("d.security_id"),
         how="inner"
-    ).fillna(0).groupBy(
+    ).groupBy(
         col("a.busi_date").alias("busi_date_during"),
         col("a.client_id"),
         col("a.branch_id"),
@@ -562,16 +730,42 @@ def p_brp_06010_d_data(spark, busi_date):
                 col("a.exchstrikefrozenmargin")
             ).otherwise(0)
         ).alias("exchstrikefrozenmargin")
+    ).select(
+        col("busi_date_during"),
+        col("client_id"),
+        col("branch_id"),
+        col("FUND_ACCOUNT_ID"),
+        col("money_type"),
+        col("trade_type"),
+        col("trade_prop"),
+        col("market_id"),
+        col("product_id"),
+        col("security_id"),
+        col("delivery_date").alias("deliv_date"),
+        col("transfee"),
+        col("market_transfee"),
+        col("remain_transfee"),
+        col("transfee_xq"),
+        col("market_transfee_xq"),
+        col("transfee_ly"),
+        col("market_transfee_ly"),
+        col("strike_qty_xq"),
+        col("strike_qty_ly"),
+        col("optstrike_profit"),
+        col("strikefrozenmargin"),
+        col("exchstrikefrozenmargin")
     )
 
-    df_tmp_brp_06010_execute = df_tmp_brp_06010_execute_01.unionall(df_tmp_brp_06010_execute_02)
+    df_tmp_brp_06010_execute = df_tmp_brp_06010_execute_01.union(df_tmp_brp_06010_execute_02)
 
     return_to_hive(
         spark=spark,
         df_result=df_tmp_brp_06010_execute,
         target_table="ddw.tmp_brp_06010_execute",
-        insert_mode="overwrite"
+        insert_mode="append"  # TODO 因为上面已经插过一次了，所以这里是append
     )
+
+    df_tmp_brp_06010_execute = spark.table("ddw.tmp_brp_06010_execute")
 
     df_x = df_tmp_brp_06010_hold.alias("w1").select(
         col("w1.busi_date_during"),
@@ -584,7 +778,7 @@ def p_brp_06010_d_data(spark, busi_date):
         col("w1.market_id"),
         col("w1.product_id"),
         col("w1.security_id"),
-        col("w1.delivery_date")
+        col("w1.deliv_date")
     ).distinct().union(
         df_tmp_brp_06010_hold_fee.alias("w11").select(
             col("w11.busi_date_during"),
@@ -597,7 +791,7 @@ def p_brp_06010_d_data(spark, busi_date):
             col("w11.market_id"),
             col("w11.product_id"),
             col("w11.security_id"),
-            col("w11.delivery_date")
+            col("w11.deliv_date")
         ).distinct()
     ).union(
         df_tmp_brp_06010_done.alias("w2").select(
@@ -611,7 +805,7 @@ def p_brp_06010_d_data(spark, busi_date):
             col("w2.market_id"),
             col("w2.product_id"),
             col("w2.security_id"),
-            col("w2.delivery_date")
+            col("w2.deliv_date")
         ).distinct()
     ).union(
         df_tmp_brp_06010_deliv.alias("w3").select(
@@ -639,12 +833,12 @@ def p_brp_06010_d_data(spark, busi_date):
             col("w4.market_id"),
             col("w4.product_id"),
             col("w4.security_id"),
-            col("w4.delivery_date")
+            col("w4.deliv_date")
         ).distinct()
     )
 
-    df_tmp_brp_06010 = df_x.alias("x").join(
-        other=df_tmp_brp_06010_hold.alias("a"),
+    df_tmp_brp_06010 = df_x.fillna(0).alias("x").join(
+        other=df_tmp_brp_06010_hold.fillna(0).alias("a"),
         on=[
             (col("x.client_id") == col("a.client_id")),
             (col("x.FUND_ACCOUNT_ID") == col("a.FUND_ACCOUNT_ID")),
@@ -657,7 +851,7 @@ def p_brp_06010_d_data(spark, busi_date):
         ],
         how="left"
     ).join(
-        other=df_tmp_brp_06010_hold_fee.alias("a1"),
+        other=df_tmp_brp_06010_hold_fee.fillna(0).alias("a1"),
         on=[
             (col("x.client_id") == col("a1.client_id")),
             (col("x.FUND_ACCOUNT_ID") == col("a1.FUND_ACCOUNT_ID")),
@@ -670,7 +864,7 @@ def p_brp_06010_d_data(spark, busi_date):
         ],
         how="left"
     ).join(
-        other=df_tmp_brp_06010_done.alias("b"),
+        other=df_tmp_brp_06010_done.fillna(0).alias("b"),
         on=[
             (col("x.client_id") == col("b.client_id")),
             (col("x.FUND_ACCOUNT_ID") == col("b.FUND_ACCOUNT_ID")),
@@ -683,7 +877,7 @@ def p_brp_06010_d_data(spark, busi_date):
         ],
         how="left"
     ).join(
-        other=df_tmp_brp_06010_deliv.alias("c"),
+        other=df_tmp_brp_06010_deliv.fillna(0).alias("c"),
         on=[
             (col("x.client_id") == col("c.client_id")),
             (col("x.FUND_ACCOUNT_ID") == col("c.FUND_ACCOUNT_ID")),
@@ -696,7 +890,7 @@ def p_brp_06010_d_data(spark, busi_date):
         ],
         how="left"
     ).join(
-        other=df_tmp_brp_06010_execute.alias("d"),
+        other=df_tmp_brp_06010_execute.fillna(0).alias("d"),
         on=[
             (col("x.client_id") == col("d.client_id")),
             (col("x.FUND_ACCOUNT_ID") == col("d.FUND_ACCOUNT_ID")),
@@ -708,7 +902,7 @@ def p_brp_06010_d_data(spark, busi_date):
             (col("x.branch_id") == col("d.branch_id"))
         ],
         how="left"
-    ).fillna().select(
+    ).select(
         col("x.busi_date_during"),
         col("x.client_id"),
         col("x.FUND_ACCOUNT_ID"),
@@ -760,10 +954,10 @@ def p_brp_06010_d_data(spark, busi_date):
         col("b.transfee_pj"),
         col("b.market_transfee_pj"),
         col("b.remain_transfee_pj"),
-        col("a1.done_amt"),
-        col("a1.close_amount_today"),
-        col("a1.done_sum"),
-        col("a1.close_money_today"),
+        col("a1.done_amt").alias("DONE_AMOUNT"),
+        col("a1.close_amount_today").alias('DONE_AMOUNT_PJ'),
+        col("a1.done_sum").alias('DONE_MONEY'),
+        col("a1.close_money_today").alias('DONE_MONEY_PJ'),
         col("a1.done_amount_avg"),
         col("a1.done_money_avg"),
         col("c.transfee").alias("DELIV_TRANSFEE"),
@@ -819,12 +1013,12 @@ def p_brp_06010_d_data(spark, busi_date):
         insert_mode="overwrite"
     )
 
-    cust_done = df_tmp_brp_06010.alias("a") \
+    cust_done = df_tmp_brp_06010.fillna(0).alias("a") \
         .join(
         other=spark.table("edw.h12_fund_account").alias("c"),
         on=col("a.fund_account_id") == col("c.fund_account_id"),
         how="left"
-    ).fillna().groupBy(
+    ).groupBy(
         col("a.busi_date_during").alias("busi_date"),
         col("a.client_id"),
         col("c.branch_id"),
@@ -835,7 +1029,7 @@ def p_brp_06010_d_data(spark, busi_date):
         col("a.trade_prop"),
         col("a.product_id"),
         col("a.security_id"),
-        col("a.delivery_date"),
+        col("a.deliv_date"),
         col("c.open_date"),
         col("a.market_id"),
         col("a.fund_account_id")
@@ -903,6 +1097,84 @@ def p_brp_06010_d_data(spark, busi_date):
         sum(col("a.done_money_qp")).alias("done_money_qp"),
         sum(col("a.force_number")).alias("force_number"),
         (sum(col("a.total_profit")) - sum(col("a.total_transfee"))).alias("clear_profit")
+    ).select(
+        col("busi_date"),
+        col("client_id"),
+        col("branch_id"),
+        col("client_type"),
+        col("frozen_status"),
+        col("money_type"),
+        col("trade_type"),
+        col("trade_prop"),
+        col("product_id"),
+        col("security_id"),
+        col("DELIV_DATE"),
+        col("open_date"),
+        col("market_id"),
+        col("fund_account_id"),
+        col("hold_amount"),
+        col("hold_money"),
+        col("hold_amount_avg"),
+        col("hold_profit_bydate"),
+        col("hold_profit_bytrade"),
+        col("buy_hold_money_qq"),
+        col("sell_hold_money_qq"),
+        col("margin"),
+        col("market_margin"),
+        col("have_trade_num"),
+        col("transfee_pj"),
+        col("market_transfee_pj"),
+        col("remain_transfee_pj"),
+        col("done_amount"),
+        col("done_amount_pj"),
+        col("done_money"),
+        col("done_money_pj"),
+        col("done_amount_avg"),
+        col("done_money_avg"),
+        col("deliv_transfee"),
+        col("deliv_market_transfee"),
+        col("deliv_remain_transfee"),
+        col("delivery_amount"),
+        col("done_amt"),
+        col("transfee_xq"),
+        col("transfee_ly"),
+        col("market_transfee_xq"),
+        col("market_transfee_ly"),
+        col("strike_qty_xq"),
+        col("strike_qty_ly"),
+        col("close_profit_bydate"),
+        col("close_profit_bytrade"),
+        col("total_transfee"),
+        col("total_market_transfee"),
+        col("total_remain_transfee"),
+        col("total_profit"),
+        col("jingshoufei"),
+        col("jiesuanfei"),
+        col("opt_premium_income"),
+        col("opt_premium_pay"),
+        col("add_fee1"),
+        col("add_fee2"),
+        col("opt_premium_income_pay"),
+        col("optstrike_profit"),
+        col("margin_tj"),
+        col("margin_tl"),
+        col("margin_tb"),
+        col("float_profit"),
+        col("hold_amount_buy"),
+        col("hold_amount_sell"),
+        col("strike_qty_dq"),
+        col("strike_money_dq"),
+        col("bzjj"),
+        col("trade_transfee"),
+        col("market_trade_transfee"),
+        col("trade_remain_transfee"),
+        col("deliv_margin"),
+        col("deliv_market_margin"),
+        col("remain_transfee_xq"),
+        col("done_amount_qp"),
+        col("done_money_qp"),
+        col("force_number"),
+        col("clear_profit")
     )
 
     df_t_rpt_06010_d = cust_done.alias("t").join(
@@ -910,7 +1182,7 @@ def p_brp_06010_d_data(spark, busi_date):
         on=col("t.security_id") == col("e.security_id"),
         how="left"
     ).join(
-        other=spark.table("edw.h16_product").alias("f"),
+        other=spark.table("edw.h13_product").alias("f"),
         on=(
                 (col("e.product_id") == col("f.product_id")) &
                 (col("e.trade_type") == col("f.trade_type")) &
@@ -1034,7 +1306,7 @@ def p_brp_06010_d_data(spark, busi_date):
     return_to_hive(
         spark=spark,
         df_result=df_t_rpt_06010_d,
-        target_table="cf_stat.t_rpt_06010",
+        target_table="ddw.t_rpt_06010",
         insert_mode="overwrite",
         partition_column="busi_date",
         partition_value=busi_date
