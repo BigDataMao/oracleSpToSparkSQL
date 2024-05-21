@@ -6,12 +6,16 @@ from pyspark.sql.types import StringType
 from utils.date_utils import *
 from utils.task_env import *
 
+config = Config()
+
 
 @log
 def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
     """
     资金对账表-月度汇总
     """
+    logger = config.get_logger()
+    logger.info("开始执行p_brp_06009_data_fgg_hy")
 
     # 注册函数
     get_trade_date_udf = udf(lambda x, n: get_trade_date(list_pub_date, x, n), StringType())
@@ -66,7 +70,7 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         insert_mode="overwrite"
     )
 
-    logging.info("cf_busimg.tmp_trade_date写入完成")
+    logger.info("cf_busimg.tmp_trade_date写入完成")
 
     # 取投资者保障基金比例
 
@@ -107,7 +111,7 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
 
     # 净流程手续费取德索数据
 
-    df_tmp_brp_06008_clear = spark.table("cf_stat.t_rpt_06008").alias("a") \
+    df_tmp_brp_06008_clear = spark.table("ddw.t_rpt_06008").alias("a") \
         .filter(
         (col("a.n_busi_date").between(v_begin_date, v_end_date))
     ).groupBy(
@@ -128,15 +132,15 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         insert_mode="overwrite"
     )
 
-    logging.info("ddw.tmp_brp_06008_clear写入完成")
+    logger.info("ddw.tmp_brp_06008_clear写入完成")
 
     # 清除分区,单月分区可不清除,直接覆盖
 
-    t_N_cust_rights = spark.table("edw.h15_client_sett").alias("a") \
+    t_N_cust_rights = spark.table("edw.h15_client_sett").fillna(0).alias("a") \
         .filter(
         (col("a.busi_date").between(v_begin_date_before, v_end_date))
     ).join(
-        other=df_tmp_trade_date.alias("b"),
+        other=df_tmp_trade_date.fillna(0).alias("b"),
         on=(col("a.busi_date") == col("b.trade_date")),
         how="inner"
     ).join(
@@ -144,7 +148,7 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         on=(col("a.fund_account_id") == col("c.fund_account_id")),
         how="inner"
     ).join(
-        other=df_tmp_brp_06008_done.alias("d"),
+        other=df_tmp_brp_06008_done.fillna(0).alias("d"),
         on=(
                 (col("a.busi_date") == col("d.busi_date")) &
                 (col("a.client_id") == col("d.client_id")) &
@@ -153,14 +157,13 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         ),
         how="left"
     ).join(
-        other=df_tmp_brp_06008_clear.alias("e"),
+        other=df_tmp_brp_06008_clear.fillna(0).alias("e"),
         on=(
                 (col("a.busi_date") == col("e.busi_date")) &
                 (col("a.fund_account_id") == col("e.fund_account_id"))
         ),
         how="left"
-    ).fillna(0)\
-        .groupBy(
+    ).groupBy(
         col("b.N_busi_date"),
         col("b.trade_flag"),
         col("a.busi_date"),
@@ -222,6 +225,67 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         sum(col("a.add_fee1") * col("b.trade_flag")).alias("ADD_FEE1"),
         sum(col("a.add_fee2") * col("b.trade_flag")).alias("ADD_FEE2"),
         sum(col("e.clear_remain_transfee") * col("b.trade_flag")).alias("clear_remain_transfee")
+    ).select(
+        col("b.N_busi_date"),
+        col("b.trade_flag"),
+        col("a.busi_date"),
+        col("c.branch_id"),
+        col("a.client_id"),
+        col("a.fund_account_id"),
+        col("a.sett_type"),
+        col("a.MONEY_TYPE"),
+        col("yes_rights"),
+        col("fund_in"),
+        col("strikeactreceivsum"),
+        col("fund_out"),
+        col("strikeactpaysum"),
+        col("fund_impawn_in"),
+        col("fund_impawn_out"),
+        col("lastfundmortgagein"),
+        col("lastfundmortgageout"),
+        col("impawn_money"),
+        col("yes_impawn_money"),
+        col("opt_premium_income"),
+        col("opt_premium_pay"),
+        col("transfee"),
+        col("delivery_transfee"),
+        col("strikefee"),
+        col("performfee"),
+        col("market_transfee"),
+        col("market_delivery_transfee"),
+        col("market_strikefee"),
+        col("market_performfee"),
+        col("today_profit"),
+        col("hold_profit"),
+        col("hold_profit_f"),
+        col("close_profit"),
+        col("drop_profit_f"),
+        col("rights"),
+        col("end_rights"),
+        col("fund_impawn_margin"),
+        col("open_pre_money"),
+        col("socrt_openfee"),
+        col("SETTLEMENTFEE"),
+        col("buy_opt_market_value"),
+        col("sell_opt_market_value"),
+        col("market_deposit"),
+        col("optstrike_profit"),
+        col("margin"),
+        col("market_margin"),
+        col("strike_credit"),
+        col("credit"),
+        col("EXECUTE_TRANSFEE"),
+        col("MARKET_EXECUTE_TRANSFEE"),
+        col("TRADE_TRANSFEE"),
+        col("MARKET_TRADE_TRANSFEE"),
+        col("REMAIN_TRADE_TRANSFEE"),
+        col("DONE_AMOUNT"),
+        col("DONE_MONEY"),
+        col("DONE_AMOUNT_PJ"),
+        col("DONE_MONEY_PJ"),
+        col("ADD_FEE1"),
+        col("ADD_FEE2"),
+        col("clear_remain_transfee")
     )
 
     t_cust_baisc_data = t_N_cust_rights.alias("a") \
@@ -280,12 +344,14 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         sum(col("a.opt_premium_income")).alias("opt_premium_income"),
         sum(col("a.opt_premium_pay")).alias("opt_premium_pay"),
         sum(col("a.transfee") + col("a.delivery_transfee") + col("a.strikefee")).alias("transfee"),
-        sum(col("a.market_transfee") + col("a.market_delivery_transfee") + col("a.market_strikefee")).alias("market_transfee"),
+        sum(col("a.market_transfee") + col("a.market_delivery_transfee") + col("a.market_strikefee")).alias(
+            "market_transfee"),
         (sum(col("a.transfee") + col("a.delivery_transfee") + col("a.strikefee"))
-            - sum(col("a.market_transfee") + col("a.market_delivery_transfee") + col("a.market_strikefee"))).alias("remain_transfee"),
+         - sum(col("a.market_transfee") + col("a.market_delivery_transfee") + col("a.market_strikefee"))).alias(
+            "remain_transfee"),
         sum(col("a.DONE_AMOUNT") * lit(v_dratio)).alias("bzjj"),
         sum(col("a.today_profit")).alias("today_profit"),
-        sum(col("a.hold_profit")).alias("hold_profit"),
+        sum(col("a.hold_profit")).alias("hold_profit_d"),
         sum(col("a.hold_profit_f")).alias("hold_profit_f"),
         sum(col("a.close_profit")).alias("close_profit"),
         sum(col("a.drop_profit_f")).alias("drop_profit_f"),
@@ -364,7 +430,7 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         sum(col("a.open_pre_money") * col("trade_flag")).alias("open_pre_money"),
         sum(col("a.impawn_money") * col("trade_flag")).alias("impawn_money"),
         (sum(col("a.open_pre_money") * col("trade_flag"))
-            - sum(col("a.impawn_money") * col("trade_flag"))).alias("pre_impawn"),
+         - sum(col("a.impawn_money") * col("trade_flag"))).alias("pre_impawn"),
         sum(
             when(
                 (col("a.busi_date") == v_end_date) & (col("a.trade_flag") == 1),
@@ -399,6 +465,77 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
             when(col("a.busi_date") == v_begin_date, col("a.yes_impawn_money")).otherwise(0)
         ).alias("begin_yes_impawn_money"),
         sum(col("a.clear_remain_transfee")).alias("clear_remain_transfee")
+    ).select(
+        col("busi_date_during"),
+        col("branch_id"),
+        col("client_id"),
+        col("fund_account_id"),
+        col("MONEY_TYPE"),
+        col('sett_type'),
+        col("yes_rights"),
+        col("fund_in"),
+        col("fund_out"),
+        col("fund_impawn_in"),
+        col("fund_impawn_out"),
+        col("FUND_IMPAWN_in_YES"),
+        col("FUND_IMPAWN_OUT_YES"),
+        col("fund_impawn_chg"),
+        col("opt_premium_income"),
+        col("opt_premium_pay"),
+        col("transfee"),
+        col("market_transfee"),
+        col("remain_transfee"),
+        col("bzjj"),
+        col("today_profit"),
+        col("hold_profit_d"),
+        col("hold_profit_f"),
+        col("close_profit"),
+        col("drop_profit_f"),
+        col("end_rights"),
+        col("max_rights"),
+        col("avg_trade_rights"),
+        col("avg_nature_rights"),
+        col("fund_impawn_margin"),
+        col("end_open_pre_money"),
+        col("end_impawn_money"),
+        col("end_pre_impawn"),
+        col("delivery_transfee"),
+        col("market_delivery_transfee"),
+        col("jingshoufei"),
+        col("jiesuanfei"),
+        col("end_opt_market_value"),
+        col("end_market_deposit"),
+        col("avg_trade_market_deposit"),
+        col("buy_opt_market_value"),
+        col("sell_opt_market_value"),
+        col("optstrike_profit"),
+        col("margin"),
+        col("market_margin"),
+        col("open_pre_money"),
+        col("impawn_money"),
+        col("pre_impawn"),
+        col("strike_credit"),
+        col("credit"),
+        col("TOTAL_OPEN_PRE_MONEY"),
+        col("TOTAL_IMPAWN_MONEY"),
+        col("TOTAL_PRE_IMPAWN"),
+        col("strikefee"),
+        col("market_strikefee"),
+        col("performfee"),
+        col("market_performfee"),
+        col("EXECUTE_TRANSFEE"),
+        col("MARKET_EXECUTE_TRANSFEE"),
+        col("TRADE_TRANSFEE"),
+        col("MARKET_TRADE_TRANSFEE"),
+        col("REMAIN_TRADE_TRANSFEE"),
+        col("DONE_AMOUNT"),
+        col("DONE_MONEY"),
+        col("DONE_AMOUNT_PJ"),
+        col("DONE_MONEY_PJ"),
+        col("ADD_FEE1"),
+        col("ADD_FEE2"),
+        col("begin_yes_impawn_money"),
+        col("clear_remain_transfee")
     )
 
     df_t_client_sett_data_m = t_cust_baisc_data.alias("a") \
@@ -455,10 +592,10 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         col("a.OPEN_PRE_MONEY"),
         col("a.IMPAWN_MONEY"),
         col("a.PRE_IMPAWN"),
-        col("a.STRIKEFEE_XQ"),
-        col("a.MARKET_STRIKEFEE_XQ"),
-        col("a.STRIKEFEE_LY"),
-        col("a.MARKET_STRIKEFEE_LY"),
+        col("a.strikefee").alias("STRIKEFEE_XQ"),
+        col("a.MARKET_STRIKEFEE").alias("MARKET_STRIKEFEE_XQ"),
+        col("a.performfee").alias("STRIKEFEE_LY"),
+        col("a.MARKET_PERFORMFEE").alias("MARKET_STRIKEFEE_LY"),
         col("a.TOTAL_OPEN_PRE_MONEY"),
         col("a.TOTAL_IMPAWN_MONEY"),
         col("a.TOTAL_PRE_IMPAWN"),
@@ -488,8 +625,6 @@ def p_brp_06009_data_fgg_hy(spark, list_pub_date, i_begin_date, i_end_date):
         df_result=df_t_client_sett_data_m,
         target_table="ddw.t_client_sett_data",
         insert_mode="overwrite",
-        partition_column="busi_date_during",
-        partition_value=i_begin_date[:6]
     )
 
-    logging.info("ddw.t_client_sett_data写入成功！")
+    logger.info("ddw.t_client_sett_data写入成功！")

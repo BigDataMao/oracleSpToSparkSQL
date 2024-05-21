@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
-from pyspark.sql.functions import col, lit, sum, when, substring, regexp_replace, round, udf, date_format, date_add, \
-    to_date, max
-from pyspark.sql.types import StringType, BooleanType
 
+from pyspark.sql.functions import col, lit, sum, when, regexp_replace, round, udf, date_format, date_add, \
+    to_date, max
+from pyspark.sql.types import StringType
+
+from config import Config
 from utils.date_utils import get_trade_date, is_trade_day_check, get_date_period_and_days, get_date_list
 from utils.io_utils.common_uitls import to_color_str
-from utils.task_env import return_to_hive, update_dataframe, logger, log
+from utils.io_utils.path_utils import get_project_path
+from utils.task_env import return_to_hive, update_dataframe, log
 
 
 @log
@@ -13,6 +16,8 @@ def p_brp_06008_fgg_data_hy(spark, list_pub_date, i_begin_date, i_end_date):
     """
     资金对账表日和落地数据
     """
+    config = Config()
+    logger = config.get_logger()
     # 注册函数 TODO 这里报错,通过zip一下utils解决
     get_trade_date_udf = udf(lambda x, n: get_trade_date(list_pub_date, x, n), StringType())
 
