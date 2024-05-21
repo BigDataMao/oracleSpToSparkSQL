@@ -153,19 +153,10 @@ if __name__ == '__main__':
     # 经营分析 - 分管部门 - 经营目标完成情况 - 按季度
     # 年数据，无逻辑
     # p_cockpit_busi_anal_tar_resp_q(spark, busi_date)
-
-    # 业务人员营业部维护 初始化
-    p_cockpit_00110_1_data(spark, busi_date)
     # 宏源-科目月余额表
     # p_hync65_account_balance(spark, busi_date)
     # 宏源-用友数据生成-财务内核表
     # p_index_result_data_branch(spark, busi_date)
-    # 财务内核表-调整前数据落地
-    # 月数据
-    p_cockpit_00127_data(spark, busi_date)
-    # 投资者保障基金调整表-初始化数据生成
-    # 月数据
-    p_cockpit_00128_data(spark, busi_date)
 
     end_time = datetime.now()
     duration = end_time - start_time
