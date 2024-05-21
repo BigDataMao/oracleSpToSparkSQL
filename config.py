@@ -4,6 +4,10 @@ import json
 import logging
 import os
 
+from utils.io_utils.path_utils import get_project_path
+
+config_file = get_project_path() + "/config.json"
+
 
 def load_config(filename):
     with open(filename, 'r') as f:
@@ -15,18 +19,13 @@ class Config:
     _instance = None  # 类变量，用于存储单例实例
     _logger = None  # 类变量，用于存储日志记录器实例
 
-    def __new__(cls, filename=None):
+    def __new__(cls):
         if cls._instance is None:
             cls._instance = super(Config, cls).__new__(cls)
-            if filename is not None:
-                cls._instance._init(filename)
         return cls._instance
 
-    def _init(self, filename):
-        if not hasattr(self, '_initialized'):  # 避免重复初始化
-            self.filename = filename
-            self.config = load_config(filename)
-            self._initialized = True  # 标记已初始化
+    def __init__(self, filename=config_file):
+        self.config = load_config(filename)
 
     def get(self, key):
         return self.config.get(key)
