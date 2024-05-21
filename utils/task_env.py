@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
 import datetime
 import functools
-import logging
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, col, coalesce, expr, when
 
-from utils.io_utils.common_uitls import to_color_str
 from config import *
-from utils.io_utils.path_utils import get_project_path
+from utils.io_utils.common_uitls import to_color_str
 
-logger = logging.getLogger("logger")
-config = Config(get_project_path() + "/config.json")
+config = Config()
 log_config = config.get("log_config")
 if_count = log_config.get("if_count")
 
@@ -45,6 +42,7 @@ def log(func):
     def wrapper(*args, **kwargs):
         func_comment = func.__doc__
         func_name = func.__name__
+        logger = config.get_logger()
 
         begin_time = datetime.datetime.now()
         logger.info("函数 %s 开始执行", func_name)
@@ -84,6 +82,7 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
     :param partition_value: 可自定义分区值
     :return: none
     """
+    logger = config.get_logger()
     # 判断是否覆盖写
     if_overwrite = insert_mode == "overwrite"
 
