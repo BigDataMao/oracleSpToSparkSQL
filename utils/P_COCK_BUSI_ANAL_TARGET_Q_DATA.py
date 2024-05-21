@@ -7,10 +7,11 @@ import logging
 
 from pyspark.sql.functions import col, lit
 
+from config import Config
 from utils.date_utils import get_quarter
 from utils.task_env import return_to_hive
 
-logging.basicConfig(level=logging.INFO)
+logger = Config().get_logger()
 
 
 # TODO:  CF_BUSIMG.T_COCKPIT_BUSI_ANAL_TARGET_Q,分区字段,busi_year,busi_quarter
@@ -39,10 +40,8 @@ def p_cock_busi_anal_target_q_data(spark, busi_date):
     df_result = spark.table("ddw.T_OA_BRANCH").alias("t") \
         .filter(
         col("t.canceled").isNull()
-    ).join(
+    ).crossJoin(
         other=spark.table("ddw.T_BUSI_ANAL_TARGET_TYPE").alias("a"),
-        on=None,
-        how="inner"
     ).select(
         lit(v_busi_year).alias("BUSI_YEAR"),
         lit(v_busi_quarter).alias("BUSI_QUARTER"),
@@ -61,5 +60,5 @@ def p_cock_busi_anal_target_q_data(spark, busi_date):
     )
 
     # TODO:  更新指标数据--待更新
-    logging.info("p_cock_busi_anal_target_q_data执行完成")
-    logging.info("本次任务为:经营分析-业务单位-经营目标完成情况-按季度")
+    logger.info("p_cock_busi_anal_target_q_data执行完成")
+    logger.info("本次任务为:经营分析-业务单位-经营目标完成情况-按季度")

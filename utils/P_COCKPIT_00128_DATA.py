@@ -6,7 +6,10 @@ import logging
 
 from pyspark.sql.functions import col, lit
 
+from config import Config
 from utils.task_env import return_to_hive, log
+
+logger = Config().get_logger()
 
 
 @log
@@ -31,4 +34,4 @@ def p_cockpit_00128_data(spark, busi_date):
         partition_value=v_busi_month
     )
 
-    logging.info("ddw.T_COCKPIT_00128写入完成")
+    logger.info("ddw.T_COCKPIT_00128写入完成")

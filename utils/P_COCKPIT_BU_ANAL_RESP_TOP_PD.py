@@ -6,7 +6,7 @@ from pyspark.sql.window import Window
 from utils.date_utils import get_date_period_and_days
 from utils.task_env import *
 
-logger = logging.getLogger("logger")
+logger = Config().get_logger()
 
 
 @log

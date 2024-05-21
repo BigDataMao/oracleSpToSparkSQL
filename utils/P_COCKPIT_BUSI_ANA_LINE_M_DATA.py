@@ -4,11 +4,12 @@ from datetime import datetime
 
 from pyspark.sql.functions import col, lit, sum, when, coalesce
 
+from config import Config
 from utils.date_utils import get_previous_year_date, get_date_period_and_days
 from utils.io_utils.common_uitls import to_color_str
 from utils.task_env import return_to_hive, update_dataframe
 
-logger = logging.getLogger("logger")
+logger = Config().get_logger()
 
 
 def p_cockpit_busi_ana_line_m_data(spark, busi_date):

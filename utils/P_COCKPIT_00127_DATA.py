@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-import logging
 
 from pyspark.sql.functions import col, min, max, when, sum, lit, coalesce, round
 
+from config import Config
 from utils.task_env import return_to_hive, update_dataframe, log
+
+logger = Config().get_logger()
 
 
 @log
@@ -15,7 +17,7 @@ def p_cockpit_00127_data(spark, busi_date):
     :return: None
     """
 
-    logging.info("开始执行p_cockpit_00127_data.py,接收到busi_date: %s", busi_date)
+    logger.info("开始执行p_cockpit_00127_data.py,接收到busi_date: %s", busi_date)
 
     i_month_id = busi_date[:6]
     df_date = spark.table("edw.t10_pub_date") \
@@ -31,12 +33,12 @@ def p_cockpit_00127_data(spark, busi_date):
     v_begin_trade_date = df_date.collect()[0]["v_begin_trade_date"]
     v_end_trade_date = df_date.collect()[0]["v_end_trade_date"]
 
-    logging.info("v_begin_trade_date: %s, v_end_trade_date: %s", v_begin_trade_date, v_end_trade_date)
+    logger.info("v_begin_trade_date: %s, v_end_trade_date: %s", v_begin_trade_date, v_end_trade_date)
 
     v_begin_month = i_month_id[:4] + '01'
     v_end_month = i_month_id
 
-    logging.info("v_begin_month: %s, v_end_month: %s", v_begin_month, v_end_month)
+    logger.info("v_begin_month: %s, v_end_month: %s", v_begin_month, v_end_month)
 
     t_cockpit_00127 = spark.table("edw.H16_BOOK_INFO") \
         .filter(col("book_id").isNotNull()) \
@@ -85,7 +87,7 @@ def p_cockpit_00127_data(spark, busi_date):
         update_columns=["b6", "b7", "b8", "b9", "b10", "b11"]
     )
 
-    logging.info("第一阶段数据处理完成")
+    logger.info("第一阶段数据处理完成")
 
     """
     二、营业支出
@@ -117,7 +119,7 @@ def p_cockpit_00127_data(spark, busi_date):
         update_columns=["b13", "b15", "b16", "b17"]
     )
 
-    logging.info("第二阶段数据处理完成")
+    logger.info("第二阶段数据处理完成")
 
     """
     三、营业利润
@@ -142,7 +144,7 @@ def p_cockpit_00127_data(spark, busi_date):
         update_columns=["b19", "b20"]
     )
 
-    logging.info("第三阶段数据处理完成")
+    logger.info("第三阶段数据处理完成")
 
     """
     四、利润总额
@@ -167,7 +169,7 @@ def p_cockpit_00127_data(spark, busi_date):
         update_columns=["b22"]
     )
 
-    logging.info("第四阶段数据处理完成")
+    logger.info("第四阶段数据处理完成")
 
     """
     本月数据最后一步
@@ -196,7 +198,7 @@ def p_cockpit_00127_data(spark, busi_date):
         .withColumnRenamed("b21_new", "b21") \
         .withColumnRenamed("b23_new", "b23")
 
-    logging.info("最后一步数据处理完成")
+    logger.info("最后一步数据处理完成")
 
     # ----------------------------------考核调出金额 begin--------------------------------------
 
@@ -252,7 +254,7 @@ def p_cockpit_00127_data(spark, busi_date):
         join_columns=["book_id", "month_id"],
         update_columns=["c6", "c7", "c8", "c9", "c10", "c11", "c13", "c14", "c15", "c16", "c17", "c19", "c20", "c22"]
     )
-    logging.info("考核调出金额数据处理完成")
+    logger.info("考核调出金额数据处理完成")
 
     # ----------------------------------考核调出金额 end----------------------------------------
 
@@ -310,7 +312,7 @@ def p_cockpit_00127_data(spark, busi_date):
         update_columns=["d6", "d7", "d8", "d9", "d10", "d11", "d13", "d14", "d15", "d16", "d17", "d19", "d20", "d22"]
     )
 
-    logging.info("考核调入金额数据处理完成")
+    logger.info("考核调入金额数据处理完成")
 
     # ----------------------------------考核调入金额 end----------------------------------------
     str_nums = [str(num) for num in range(5, 24)]
@@ -324,7 +326,7 @@ def p_cockpit_00127_data(spark, busi_date):
             .drop("f"+i)\
             .withColumnRenamed("f"+i+"_new", "f"+i)
 
-    logging.info("实际金额数据处理完成")
+    logger.info("实际金额数据处理完成")
 
     # ----------------------------------本年金额 begin--------------------------------------
 
@@ -377,7 +379,7 @@ def p_cockpit_00127_data(spark, busi_date):
         .drop("g5")\
         .withColumnRenamed("g5_new", "g5")
 
-    logging.info("本年金额数据处理完成")
+    logger.info("本年金额数据处理完成")
 
     # ----------------------------------本年金额 end--------------------------------------
 

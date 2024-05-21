@@ -7,9 +7,10 @@ import logging
 
 from pyspark.sql.functions import col, lit
 
+from config import Config
 from utils.task_env import return_to_hive
 
-logging.basicConfig(level=logging.INFO)
+logger = Config().get_logger()
 
 
 # TODO: CF_BUSIMG.T_COCKPIT_BUSI_ANAL_TARGET_Y,按年分区,分区字段,busi_year
@@ -20,10 +21,8 @@ def p_cock_busi_anal_target_y_data(spark, busi_date):
     df_result = spark.table("ddw.T_OA_BRANCH").alias("t") \
         .filter(
         col("t.canceled").isNull()
-    ).join(
-        other=spark.table("ddw.T_BUSI_ANAL_TARGET_TYPE").alias("a"),
-        on=None,
-        how="inner"
+    ).crossJoin(
+        other=spark.table("ddw.T_BUSI_ANAL_TARGET_TYPE").alias("a")
     ).select(
         lit(v_busi_year).alias("BUSI_YEAR"),
         col("t.departmentid"),
@@ -36,10 +35,8 @@ def p_cock_busi_anal_target_y_data(spark, busi_date):
         df_result=df_result,
         target_table="ddw.T_COCKPIT_BUSI_ANAL_TARGET_Y",
         insert_mode="overwrite",
-        partition_column="busi_year",
-        partition_value=v_busi_year
     )
 
     # TODO:  更新指标数据--待更新
-    logging.info("p_cock_busi_anal_target_y_data执行完成")
-    logging.info("本次任务为: 经营分析-业务单位-经营目标完成情况-按年落地")
+    logger.info("p_cock_busi_anal_target_y_data执行完成")
+    logger.info("本次任务为: 经营分析-业务单位-经营目标完成情况-按年落地")

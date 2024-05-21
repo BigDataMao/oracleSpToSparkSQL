@@ -7,7 +7,7 @@ from pyspark.sql.functions import col, lit, sum, when, substring, regexp_replace
 from utils.date_utils import *
 from utils.task_env import *
 
-logger = logging.getLogger("logger")
+logger = Config().get_logger()
 
 
 @log

@@ -3,11 +3,13 @@
 import logging
 
 from pyspark.sql.functions import col, lit, sum, when
+
+from config import Config
 from utils.date_utils import *
 from utils.io_utils.common_uitls import to_color_str
 from utils.task_env import return_to_hive, update_dataframe
 
-logger = logging.getLogger("logger")
+logger = Config().get_logger()
 
 
 def p_cockpit_busi_anal_respons_d(spark, busi_date):

@@ -6,7 +6,7 @@ from pyspark.sql.functions import sum, rank
 from utils.date_utils import *
 from utils.task_env import *
 
-logger = logging.getLogger("logger")
+logger = Config().get_logger()
 
 
 @log

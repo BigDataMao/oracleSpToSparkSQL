@@ -4,10 +4,11 @@ import logging
 from pyspark.sql import Window
 from pyspark.sql.functions import col, lit, sum, rank
 
+from config import Config
 from utils.date_utils import get_busi_week_int, get_mon_sun_str
 from utils.task_env import return_to_hive, log
 
-logger = logging.getLogger("logger")
+logger = Config().get_logger()
 
 
 @log
