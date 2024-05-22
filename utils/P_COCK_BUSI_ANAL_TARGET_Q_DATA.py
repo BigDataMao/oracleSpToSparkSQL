@@ -128,8 +128,7 @@ def p_cock_busi_anal_target_q_data(spark, busi_date):
                 (df_138_yq['index_type'] == '1') & (df_138_yq['index_asses_benchmark'] == '4'),
                 '007'
             ).when(
-                (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '5') &
-                (df_138_yq['index_name'].like('%新增直接开发有效客户数量%')),
+                (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '5'),
                 '008'
             ).when(
                 (df_138_yq['index_type'] == '1') & (df_138_yq['index_asses_benchmark'] == '5'),
@@ -168,15 +167,24 @@ def p_cock_busi_anal_target_q_data(spark, busi_date):
             ).otherwise(0).alias('complete_value_rate')
         )
 
-        update_dataframe(
+        df_yq = update_dataframe(
             df_to_update=df_yq,
             df_use_me=df_y,
             join_columns=['oa_branch_id', 'busi_type'],
             update_columns=['complete_value', 'complete_value_rate']
         )
 
+        return df_yq
+
     df_yq = init_data()
-    update_data(df_yq)
+    df_yq = update_data(df_yq)
+
+    return_to_hive(
+        spark=spark,
+        df_result=df_yq,
+        target_table="ddw.T_COCKPIT_BUSI_ANAL_TARGET_Q",
+        insert_mode="overwrite",
+    )
 
     logger.info("p_cock_busi_anal_target_q_data执行完成")
     logger.info("本次任务为:经营分析-业务单位-经营目标完成情况-按季度")
