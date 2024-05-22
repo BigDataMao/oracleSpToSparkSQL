@@ -5,7 +5,7 @@ import oracledb
 
 from config import Config
 
-config = Config('config.json')
+config = Config()
 # logger = config.get_logger()
 database = config.get('database')
 user = database.get('user')
