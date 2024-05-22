@@ -66,8 +66,22 @@ def format_show_createtable_output(out):
         >>> )
 
     """
-    out = out[out.find('(') + 1:out.find(')')]
     out = out.replace('`', '').replace('\n', '')
+
+    # Split the DDL into main and partition sections
+    main_section_start = out.find('(') + 1
+    main_section_end = out.find(')', main_section_start)
+    main_section = out[main_section_start:main_section_end]
+
+    partition_section_start = out.find('PARTITIONED BY')
+    if partition_section_start != -1:
+        partition_section_start += len('PARTITIONED BY')
+        partition_section_start = out.find('(', partition_section_start) + 1
+        partition_section_end = out.find(')', partition_section_start)
+        partition_section = out[partition_section_start:partition_section_end]
+        out = main_section + ',' + partition_section
+    else:
+        out = main_section
 
     data = []
     for column in out.split(','):
