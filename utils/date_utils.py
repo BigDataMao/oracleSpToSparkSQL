@@ -243,3 +243,20 @@ def get_date_list(begin_date, end_date):
         begin_date += timedelta(days=1)
 
     return date_list
+
+
+def get_month_str(busi_month, n=0):
+    """
+    根据指定日期字符串,获取指定月份数的月份字符串
+    :param busi_month: 日期字符串, 格式为 'YYYYMM'
+    :param n: 整数, 表示第 n 个月, 默认为 0, 负数表示向前 n 个月, 正数表示向后 n 个月
+    :return: 月份字符串, 格式为 'YYYYMM'
+    """
+    all_months = int(busi_month[:4]) * 12 + int(busi_month[4:])
+    all_months += n
+    year = all_months // 12
+    month = all_months % 12
+    if month == 0:
+        year -= 1
+        month = 12
+    return '{:04d}{:02d}'.format(year, month)
