@@ -19,8 +19,6 @@ from utils.P_COCKPIT_00138_DATA import p_cockpit_00138_data
 from utils.parse_arguments import parse_arguments
 from utils.task_env import *
 
-reload(sys)
-sys.setdefaultencoding("utf-8")
 
 config = Config(get_project_path() + "/config.json")
 

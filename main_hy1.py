@@ -13,9 +13,6 @@ from utils.io_utils.path_utils import get_project_path
 from utils.parse_arguments import parse_arguments
 from utils.task_env import create_env
 
-reload(sys)
-sys.setdefaultencoding("utf-8")
-
 
 if __name__ == '__main__':
     spark = create_env()
