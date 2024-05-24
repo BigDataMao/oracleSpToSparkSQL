@@ -17,11 +17,15 @@ if_count = log_config.get("if_count")
 def create_env():
     spark = SparkSession.builder \
         .appName("HiveTest") \
-        .config("spark.master", "local") \
+        .config("spark.master", "yarn") \
         .config("spark.sql.warehouse.dir", "hdfs://cdh-master:8020/user/hive/warehouse") \
         .config("spark.hadoop.hive.metastore.uris", "thrift://cdh-master:9083") \
         .config("spark.hadoop.hive.exec.scratchdir", "/user/hive/tmp") \
+        .config("hive.exec.dynamic.partition", "true") \
         .config("hive.exec.dynamic.partition.mode", "nonstrict") \
+        .config("hive.exec.max.dynamic.partitions", "1000") \
+        .config("hive.exec.max.dynamic.partitions.pernode", "500") \
+        .config("spark.default.parallelism", "32") \
         .config("spark.debug.maxToStringFields", "300") \
         .config("spark.driver.extraJavaOptions", "-Dfile.encoding=UTF-8") \
         .config("spark.executor.extraJavaOptions", "-Dfile.encoding=UTF-8") \
