@@ -45,20 +45,23 @@ def p_index_result_data_branch(spark: SparkSession, busi_date):
 
     def insert_data(month, index_row: dict, df_in):
         df_out = df_in.alias('t').select(
+            lit(None).alias("pk_id"),
             col("t.book_id"),
             lit(month).alias("busi_month"),
             lit(index_row["index_para_name"]).alias("index_para_name"),
             lit(index_row["index_id"]).alias("index_id"),
             lit(index_row["index_name"]).alias("index_name"),
-            col("t.index_value")
+            col("t.index_value"),
+            lit(None).alias("sys_date")
         )
 
-        return_to_hive(
-            spark=spark,
-            df_result=df_out,
-            target_table="ddw.t_hync65_index_result_branch",
-            insert_mode="append"
-        )
+        # return_to_hive(
+        #     spark=spark,
+        #     df_result=df_out,
+        #     target_table="ddw.t_hync65_index_result_branch",
+        #     insert_mode="append"
+        # )
+        df_out.write.mode("append").insertInto("ddw.t_hync65_index_result_branch")
 
     tmp_month_list = get_tmp_month()
 
