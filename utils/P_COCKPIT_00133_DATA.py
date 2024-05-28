@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-import logging
 from datetime import datetime, timedelta
 
 from pyspark.sql.functions import col, lit, min, max, count, sum, coalesce, when, trim, regexp_replace
 
+from config import Config
 from utils.P_COCKPIT_00110_BEFORE import p_cockpit_00110_before
 from utils.task_env import return_to_hive, update_dataframe, log
 
+logger = Config().get_logger()
 
 @log
 def p_cockpit_00133_data(spark, busi_date):
@@ -47,7 +48,7 @@ def p_cockpit_00133_data(spark, busi_date):
     v_begin_date = first_row["v_begin_date"]
     v_end_date = first_row["v_end_date"]
 
-    logging.info(
+    logger.info(
         u"""
         v_begin_trade_date: %s
         v_end_trade_date:   %s

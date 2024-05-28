@@ -3,10 +3,11 @@ import logging
 
 from pyspark.sql.functions import col, lit, sum, when, coalesce, trim, regexp_replace, expr
 
+from config import Config
 from utils.date_utils import get_date_period_and_days
 from utils.task_env import return_to_hive, update_dataframe, log
 
-logger = logging.getLogger("logger")
+logger = Config().get_logger()
 
 
 @log

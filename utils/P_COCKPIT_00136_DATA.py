@@ -2,13 +2,13 @@
 """
 经营目标责任书-数据生成
 """
-import logging
 
 from pyspark.sql.functions import col, lit
 
+from config import Config
 from utils.task_env import return_to_hive, update_dataframe, log
 
-logger = logging.getLogger("logger")
+logger = Config().get_logger()
 
 
 @log

@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import sys
-from imp import reload
 
 from utils.P_COCKPIT_00092_DATA import p_cockpit_00092_data
 from utils.P_COCKPIT_00093_DATA import p_cockpit_00093_data
@@ -20,7 +18,7 @@ from utils.parse_arguments import parse_arguments
 from utils.task_env import *
 
 
-config = Config(get_project_path() + "/config.json")
+config = Config()
 
 
 if __name__ == '__main__':

@@ -62,11 +62,14 @@ def log(func):
             raise
 
         end_time = datetime.datetime.now()
-        logger.info(to_color_str("函数 {} 执行完成".format(func_name), "green"))
         duration = end_time - begin_time
-        # 转成分秒,整数
         duration = divmod(duration.seconds, 60)
-        logger.info("函数 %s 执行时间: %s 分 %s 秒", func_name, duration[0], duration[1])
+        logger.info(
+            to_color_str(
+                f"函数 {func_name} 执行完成, 耗时{duration[0]}分{duration[1]}秒",
+                "green"
+            )
+        )
 
         return result_func
 
