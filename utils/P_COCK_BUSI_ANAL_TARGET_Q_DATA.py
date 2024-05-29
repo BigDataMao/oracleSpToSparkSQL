@@ -13,8 +13,6 @@ from utils.StructTypes.ddw_t_cockpit_busi_anal_target_q import schema as ddw_t_c
 logger = Config().get_logger()
 
 
-# TODO:  CF_BUSIMG.T_COCKPIT_BUSI_ANAL_TARGET_Q,分区字段,busi_year,busi_quarter
-
 @log
 def p_cock_busi_anal_target_q_data(spark, busi_date):
     """
@@ -70,7 +68,7 @@ def p_cock_busi_anal_target_q_data(spark, busi_date):
         初始化数据
         :return: df
         """
-        df_yq = df_oa_branch.filter(
+        df = df_oa_branch.filter(
             df_oa_branch['canceled'].isNull()
         ).crossJoin(
             other=df_busi_anal_target_type
@@ -84,21 +82,21 @@ def p_cock_busi_anal_target_q_data(spark, busi_date):
 
         return_to_hive(
             spark=spark,
-            df_result=df_yq,
-            target_table="ddw.T_COCKPIT_BUSI_ANAL_TARGET_Y",
+            df_result=df,
+            target_table="ddw.T_COCKPIT_BUSI_ANAL_TARGET_Q",
             insert_mode="overwrite",
         )
 
-        df_yq = spark.table('ddw.T_COCKPIT_BUSI_ANAL_TARGET_Y')
-        df_yq = spark.createDataFrame(
-            data=df_yq.rdd,
+        df = spark.table('ddw.T_COCKPIT_BUSI_ANAL_TARGET_Q')
+        df = spark.createDataFrame(
+            data=df.rdd,
             schema=ddw_t_cockpit_busi_anal_target_q_schema
         )
 
-        return df_yq
+        return df
 
     @log
-    def update_data(df_yq):
+    def update_data(df):
         """
         更新数据
         :return: None
@@ -167,8 +165,8 @@ def p_cock_busi_anal_target_q_data(spark, busi_date):
             ).otherwise(0).alias('complete_value_rate')
         )
 
-        df_yq = update_dataframe(
-            df_to_update=df_yq,
+        df = update_dataframe(
+            df_to_update=df,
             df_use_me=df_y,
             join_columns=['oa_branch_id', 'busi_type'],
             update_columns=['complete_value', 'complete_value_rate']
