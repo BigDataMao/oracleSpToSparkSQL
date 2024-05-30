@@ -2,7 +2,7 @@
 import datetime
 import functools
 
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import lit, col, coalesce, expr, when
 
 from config import *
@@ -77,7 +77,7 @@ def log(func):
 
 
 @log
-def return_to_hive(spark, df_result, target_table, insert_mode, partition_column=None, partition_value=None):
+def return_to_hive(spark: SparkSession, df_result: DataFrame, target_table, insert_mode, partition_column=None, partition_value=None):
     """
     用于将数据返回hive或hive分区表,
     不需要指定是否分区表,因为会开启动态分区
@@ -89,9 +89,15 @@ def return_to_hive(spark, df_result, target_table, insert_mode, partition_column
     :param partition_value: 可自定义分区值
     :return: none
     """
+    # 纠错,先清除target_table中的数据 TODO 如果打开这个注释,会清空表中的数据,并且P_COCK_BUSI_ANAL_TARGET_Q_DATA.py会报错
+    # spark.sql("truncate table {}".format(target_table))
+
     logger = config.get_logger()
     # 判断是否覆盖写
     if_overwrite = insert_mode == "overwrite"
+
+    # 强制转换df_result中的列名为小写
+    df_result = df_result.toDF(*[c.lower() for c in df_result.columns])
 
     # 获取目标表的元数据信息
     target_columns = [c.name for c in spark.table(target_table).schema]
