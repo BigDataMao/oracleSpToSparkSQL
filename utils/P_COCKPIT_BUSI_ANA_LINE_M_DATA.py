@@ -47,8 +47,6 @@ def p_cockpit_busi_ana_line_m_data(spark, busi_date):
     v_new_end_date = v_end_date
     v_now_end_date = v_end_date
 
-    # TODO: CF_BUSIMG.T_COCKPIT_BUSI_ANALYSE_LINE_M,分区字段,busi_month
-
     # 初始化数据
     logger.info(to_color_str("初始化数据", "red"))
 

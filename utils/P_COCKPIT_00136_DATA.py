@@ -15,7 +15,6 @@ logger = Config().get_logger()
 def p_cockpit_00136_data(spark, busi_date):
     """
     经营目标责任书-数据生成
-    TODO 逻辑待优化
     """
     # 获取年份
     i_year_id = busi_date[:4]

@@ -28,7 +28,6 @@ def p_cockpit_anal_line_top_data(spark, busi_date):
     # 找到给定日期所在周的星期一和星期日
     v_begin_date, v_end_date = get_mon_sun_str(busi_date)
 
-    # TODO: CF_BUSIMG.T_COCKPIT_CLIENT_ANAL_LINE_TOP做成分区表,并且分区字段为busi_year, busi_week
     # 删除指定分区的数据
     spark.sql(
         "alter table ddw.t_cockpit_client_analyse_top drop if exists partition(busi_year='{}', busi_week='{}')".format(

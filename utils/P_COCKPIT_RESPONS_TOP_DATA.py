@@ -26,8 +26,6 @@ def p_cockpit_respons_top_data(spark, busi_date):
     # 找到给定日期所在周的星期一和星期日
     v_begin_date, v_end_date = get_mon_sun_str(busi_date)
 
-    # TODO: CF_BUSIMG.P_COCKPIT_RESPONS_TOP_DATA做成分区表,并且分区字段为busi_year, busi_week
-
     """
     指标类型(1:入金前9名，2：出金前9名，3：盈利前9名，4：亏损前9名，5：收入贡献前9名，6：成交量前9名，7：成交额前9名)
     """

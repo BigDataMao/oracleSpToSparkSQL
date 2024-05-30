@@ -29,8 +29,6 @@ def p_cockpit_busi_ana_top_pd_data(spark, busi_date):
         is_trade_day=True
     )
 
-    # TODO: CF_BUSIMG.T_COCKPIT_BUSI_ANALYSE_TOP_PD,分区字段,busi_month
-
     tmp = spark.table("edw.h15_hold_balance").alias("t") \
         .filter(
         (col("t.busi_date").between(v_begin_date, v_end_date))

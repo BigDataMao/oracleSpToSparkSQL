@@ -25,7 +25,7 @@ def p_cockpit_client_respons_data(spark, busi_date):
     v_last_open_begin_date = v_last_year + '0101'
     v_last_open_end_date = v_last_year + '1231'
     v_open_begin_date = busi_date[:4] + '0101'
-    v_open_end_date = v_busi_month + '31'  # TODO: 这里存疑
+    v_open_end_date = v_busi_month + '31'
 
     v_begin_date, v_end_date, v_trade_days = get_date_period_and_days(
         spark=spark,

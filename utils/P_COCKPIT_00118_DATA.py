@@ -248,11 +248,9 @@ def p_cockpit_00118_data(spark, busi_date):
     # 记录 df_t_cockpit_00118的字段名
     logger.info("248行,字段名: %s", df_t_cockpit_00118.columns)
 
-    # return_to_hive(
-    #     spark=spark,
-    #     df_result=df_t_cockpit_00118,
-    #     target_table="ddw.T_COCKPIT_00118",
-    #     insert_mode="overwrite",
-    #     partition_column="busi_month",
-    #     partition_value=i_month_id
-    # )
+    return_to_hive(
+        spark=spark,
+        df_result=df_t_cockpit_00118,
+        target_table="ddw.T_COCKPIT_00118",
+        insert_mode="overwrite",
+    )

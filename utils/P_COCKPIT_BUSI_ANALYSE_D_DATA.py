@@ -23,8 +23,6 @@ def p_cockpit_busi_analyse_d_data(spark, busi_date):
         is_trade_day=True
     )[1]
 
-    # TODO: CF_BUSIMG.T_COCKPIT_BUSI_ANALYSE_D,分区字段,busi_date
-
     # 初始化数据
     df_d = spark.table("ddw.T_OA_BRANCH").alias("t") \
         .filter(
