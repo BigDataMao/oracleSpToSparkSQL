@@ -26,6 +26,13 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
     v_now_end_date = v_end_date
     i_month_id = busi_date[:6]
 
+    logger.info(
+        "v_begin_date: %s, v_end_date: %s, v_now_begin_date: %s, v_now_trade_days: %s, v_new_begin_date: %s, "
+        "v_new_end_date: %s, v_now_end_date: %s, i_month_id: %s",
+        v_begin_date, v_end_date, v_now_begin_date, v_now_trade_days, v_new_begin_date, v_new_end_date,
+        v_now_end_date, i_month_id
+    )
+
     # 初始化数据
     df_m = spark.table("ddw.t_oa_branch").alias("t") \
         .filter(
@@ -46,6 +53,8 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         col("BUSI_MONTH") == i_month_id
     )
 
+    logger.info("df_m: %s条", df_m.count())
+
     # 财务指标 TODO
     # 收入结构 TODO
     # 业务指标-日均权益
@@ -63,7 +72,7 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
     ).filter(
         col("c.oa_branch_id").isNotNull()
     ).groupBy(
-        col("t.fund_account_id"),
+        # col("t.fund_account_id"),
         when(
             (col("b.open_date").between(v_new_begin_date, v_new_end_date)),
             lit(1)
@@ -72,11 +81,13 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
     ).agg(
         sum("t.rights").alias("sum_rights")
     ).select(
-        col("t.fund_account_id"),
+        # col("t.fund_account_id"),
         col("is_new_flag"),
         col("c.oa_branch_id"),
         col("sum_rights")
     )
+
+    logger.info("tmp_new: %s条", tmp_new.count())
 
     tmp_result = tmp_new.alias("t") \
         .select(
@@ -95,6 +106,8 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         ).otherwise(lit(0)).alias("sum_avg_rights")
     )
 
+    logger.info("tmp_result: %s条", tmp_result.count())
+
     df_y = tmp_result.alias("t") \
         .select(
         col("t.oa_branch_id"),
@@ -109,6 +122,8 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
             col("t.AVG_RIGHTS_NEW") / col("t.sum_avg_rights")
         ).otherwise(lit(0)).alias("AVG_RIGHTS_NEW_PROP")
     )
+
+    logger.info("df_y: %s条", df_y.count())
 
     df_m = update_dataframe(
         df_to_update=df_m,
@@ -134,6 +149,8 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         col("BUSI_MONTH") == i_month_id
     )
 
+    logger.info("df_m: %s条", df_m.count())
+
     # 业务指标-成交量
     # 业务指标-成交额
 
@@ -151,7 +168,7 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
     ).filter(
         col("c.oa_branch_id").isNotNull()
     ).groupBy(
-        col("t.fund_account_id"),
+        # col("t.fund_account_id"),
         when(
             (col("b.open_date").between(v_new_begin_date, v_new_end_date)),
             lit(1)
@@ -161,12 +178,14 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         sum("t.done_amt").alias("done_amount"),
         sum("t.done_sum").alias("done_money")
     ).select(
-        col("t.fund_account_id"),
+        # col("t.fund_account_id"),
         col("is_new_flag"),
         col("c.oa_branch_id"),
         col("done_amount"),
         col("done_money")
     )
+
+    logger.info("tmp_new: %s条", tmp_new.count())
 
     tmp_result = tmp_new.alias("t") \
         .select(
@@ -190,6 +209,8 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         col("t.done_amount").alias("SUM_DONE_AMOUNT"),
         col("t.done_money").alias("SUM_DONE_MONEY")
     )
+
+    logger.info("tmp_result: %s条", tmp_result.count())
 
     df_y = tmp_result.alias("t") \
         .select(
@@ -216,6 +237,8 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
         ).otherwise(lit(0)).alias("DONE_MONEY_NEW_PROP")
     )
 
+    logger.info("df_y: %s条", df_y.count())
+
     df_m = update_dataframe(
         df_to_update=df_m,
         df_use_me=df_y,
@@ -231,6 +254,8 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
             "DONE_MONEY_NEW_PROP"
         ]
     )
+
+    logger.info("df_m: %s条", df_m.count())
 
     # 写回hive,再次读取
     return_to_hive(
@@ -297,7 +322,7 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
     ).filter(
         col("c.oa_branch_id").isNotNull()
     ).groupBy(
-        col("t.fund_account_id"),
+        # col("t.fund_account_id"),
         col("c.oa_branch_id")
     ).agg(
         sum("t.rights").alias("rights"),
@@ -307,7 +332,7 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
             coalesce(col("t.strikefee"), lit(0))
         ).alias("transfee")
     ).select(
-        col("t.fund_account_id"),
+        # col("t.fund_account_id"),
         col("c.oa_branch_id"),
         col("rights"),
         col("transfee")
@@ -381,13 +406,13 @@ def p_cockpit_busi_analyse_m_data(spark, busi_date):
     ).filter(
         col("c.oa_branch_id").isNotNull()
     ).groupBy(
-        col("t.fund_account_id"),
+        # col("t.fund_account_id"),
         col("c.oa_branch_id")
     ).agg(
         sum("t.done_amt").alias("done_amount"),
         sum("t.done_sum").alias("done_money")
     ).select(
-        col("t.fund_account_id"),
+        # col("t.fund_account_id"),
         col("c.oa_branch_id"),
         col("done_amount"),
         col("done_money")
