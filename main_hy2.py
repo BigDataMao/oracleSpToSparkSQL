@@ -60,26 +60,6 @@ if __name__ == '__main__':
     pub_date_table = "edw.t10_pub_date"
     start_time = datetime.now()
 
-    def get_pub_date_list():
-        df_pub_date = spark.table(pub_date_table) \
-            .filter(
-            (col("market_no") == "1") &
-            (col("trade_flag") == "1")
-        ).select(
-            col("busi_date")
-        )
-        # 将DataFrame转换为JSON字符串并收集为列表
-        json_list_pub_date = df_pub_date.toJSON().collect()
-        # 解析JSON字符串并转换为字典列表
-        dict_list_pub_date = [json.loads(json_str) for json_str in json_list_pub_date]
-        # 提取字典列表中的"busi_date"值
-        pub_date_list = [x["busi_date"] for x in dict_list_pub_date]
-        pub_date_list.sort()
-        logger.info("最大交易日期为: %s", pub_date_list[-1:])
-        return pub_date_list
-
-    list_pub_date = get_pub_date_list()
-
     # 千万工程指标数据落地
     # p_cockpit_00092_data(spark, busi_date)
     # 千万工程开户时间区间落地数据
