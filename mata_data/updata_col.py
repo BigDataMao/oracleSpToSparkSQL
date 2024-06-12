@@ -80,7 +80,7 @@ col_map = {
 }
 with oracle_pool.cursor() as cursor:
     for key in col_map:
-        sql = f"UPDATE DMP.T_MD_OBJ SET OBJ_NAME = {col_map.get(key)} where OBJ_CODE = {key}"
+        sql = f"UPDATE DMP.T_MD_OBJ SET OBJ_NAME = '{col_map.get(key)}' where OBJ_CODE = '{key}'"
         cursor.execute(sql)
 oracle_pool.commit()
 pool.release(oracle_pool)
