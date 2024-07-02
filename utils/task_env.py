@@ -30,6 +30,7 @@ def create_env():
         .config("spark.driver.extraJavaOptions", "-Dfile.encoding=UTF-8") \
         .config("spark.executor.extraJavaOptions", "-Dfile.encoding=UTF-8") \
         .config("hive.metastore.event.db.notification.api.auth", "true") \
+        .config("spark.jars", "file:///usr/share/java/ojdbc6.jar") \
         .enableHiveSupport() \
         .getOrCreate()
     spark.sparkContext.setLogLevel("WARN")
