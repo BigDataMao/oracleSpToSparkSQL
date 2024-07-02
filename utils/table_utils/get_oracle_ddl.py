@@ -45,7 +45,7 @@ def get_oracle_ddl(table_info: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 error, = e.args
                 # 如果是ORA-31603错误，表示对象不存在，继续处理下一个表
                 if error.code == 31603:
-                    print("表 %s 不存在" % (item.get('oracle_table') + '.' + item.get('oracle_db')))
+                    print("表 %s 不存在" % (item.get('oracle_db') + '.' + item.get('oracle_table')))
                     item["oracle_ddl"] = None
                     continue
                 else:
