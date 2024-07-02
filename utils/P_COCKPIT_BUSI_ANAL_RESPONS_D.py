@@ -165,20 +165,20 @@ def p_cockpit_busi_anal_respons_d(spark, busi_date):
         how="left"
     ).select(
         col("t.RESPONS_LINE_ID"),
-        col("t.stock_end_rights"),
+        (col("t.stock_end_rights") / 10000).alias("stock_end_rights"),
         when(
             col("t.total_end_rights") != 0,
-            col("t.stock_end_rights") / col("t.total_end_rights")
+            col("t.stock_end_rights") / col("t.total_end_rights") * 100
         ).otherwise(0).alias("stock_end_rights_prop"),
-        col("t.new_end_rights"),
+        (col("t.new_end_rights") / 10000).alias("new_end_rights"),
         when(
             col("t.total_end_rights") != 0,
-            col("t.new_end_rights") / col("t.total_end_rights")
+            col("t.new_end_rights") / col("t.total_end_rights") * 100
         ).otherwise(0).alias("new_end_rights_prop"),
-        col("t.total_end_rights").alias("end_rights"),
+        (col("t.total_end_rights") / 10000).alias("end_rights"),
         when(
             col("a.total_end_rights") != 0,
-            col("t.total_end_rights") / col("a.total_end_rights") - 1
+            (col("t.total_end_rights") / col("a.total_end_rights") - 1) * 100
         ).otherwise(0).alias("end_rights_yoy")
     )
 
