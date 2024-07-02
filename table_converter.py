@@ -10,6 +10,8 @@ from utils.io_utils.csv_utils import csv_to_dict_list
 from utils.table_utils.get_oracle_ddl import get_oracle_ddl
 from utils.table_utils.oracle_ddl_to_hive_ddl import oracle_ddl_to_hive, generate_hive_ddl
 
+is_drop = True
+
 # 当前目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # 项目目录
@@ -38,7 +40,8 @@ table_info_clean = get_oracle_ddl(table_info)
 
 
 conn = hive.Connection(
-    host='cdh-master',
+    # host='cdh-master',
+    host='192.168.25.10',
     port=10000,
     username='root'
 )
@@ -48,6 +51,12 @@ for item in table_info_clean:
     print(hive_ddl)
 
     curser = conn.cursor()
+
+    if is_drop:
+        query = "DROP TABLE IF EXISTS %s" % item.get('hive_table_fullname')
+        curser.execute(query)
+        logging.info("Table %s dropped successfully" % item.get('hive_table_fullname'))
+
     query = hive_ddl
     curser.execute(query)
     logging.info("Table %s created successfully" % item.get('hive_table_fullname'))
