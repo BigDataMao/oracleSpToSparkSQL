@@ -156,20 +156,20 @@ def p_cockpit_busi_ana_line_d_data(spark, busi_date):
         how="left"
     ).select(
         col("t.Business_Line_Id"),
-        col("t.stock_end_rights"),
+        (col("t.stock_end_rights") / 10000).alias("STOCK_END_RIGHTS"),
         when(
             col("t.total_end_rights") != 0,
-            col("t.stock_end_rights") / col("t.total_end_rights")
+            col("t.stock_end_rights") / col("t.total_end_rights") * 100
         ).otherwise(0).alias("STOCK_END_RIGHTS_PROP"),
-        col("t.new_end_rights"),
+        (col("t.new_end_rights") / 10000).alias("NEW_END_RIGHTS"),
         when(
             col("t.total_end_rights") != 0,
-            col("t.new_end_rights") / col("t.total_end_rights")
+            col("t.new_end_rights") / col("t.total_end_rights") * 100
         ).otherwise(0).alias("NEW_END_RIGHTS_PROP"),
-        col("t.total_end_rights").alias("END_RIGHTS"),
+        (col("t.total_end_rights") / 10000).alias("END_RIGHTS"),
         when(
             col("a.total_end_rights") != 0,
-            col("t.total_end_rights") / col("a.total_end_rights") - 1
+            (col("t.total_end_rights") / col("a.total_end_rights") - 1) * 100
         ).otherwise(0).alias("END_RIGHTS_YOY")
     )
 
