@@ -69,8 +69,8 @@ def p_cockpit_busi_ana_top_pd_data(spark, busi_date):
         col("t.oa_branch_id"),
         col("t.product_id"),
         col("t.product_name"),
-        col("t.done_amount"),
-        col("t.done_money"),
+        (col("t.done_amount") / 10000).alias("done_amount"),  # 万手
+        (col("t.done_money") / 100000000).alias("done_money"),  # 亿元,
         rank().over(
             Window.partitionBy("t.oa_branch_id").orderBy(col("t.done_amount").desc())
         ).alias("RANK_DONE_AMOUNT"),
