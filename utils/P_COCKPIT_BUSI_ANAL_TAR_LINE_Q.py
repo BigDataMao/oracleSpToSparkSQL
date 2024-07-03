@@ -145,7 +145,7 @@ def p_cockpit_busi_anal_tar_line_q(spark, busi_date):
         tmp['complete_value'],
         when(
             tmp['year_target_value'] != 0,
-            tmp['complete_value'] / tmp['year_target_value']
+            tmp['complete_value'] / tmp['year_target_value'] * 100
         ).otherwise(0).alias('complete_value_rate')
     )
 
