@@ -103,8 +103,8 @@ def p_cockpit_bu_anal_resp_top_pd(spark, busi_date):
         col("respons_line_id"),
         col("product_id"),
         col("product_name"),
-        col("done_amount"),
-        col("done_money"),
+        (col("done_amount") / 10000).alias("done_amount"),  # 万手
+        (col("done_money") / 100000000).alias("done_money"),  # 亿元
         col("rank_done_amount"),
         col("rank_done_money")
     )
