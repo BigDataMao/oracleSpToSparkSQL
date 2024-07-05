@@ -14,7 +14,8 @@ def p_cockpit_client_analyse_data(spark, busi_date):
     """
 
     v_busi_month = busi_date[:6]
-    v_last_busi_month = str(int(v_busi_month) - 100)
+    v_jgx_busi_date = v_busi_month + '01'
+    v_last_busi_month = str(int(v_busi_month) - 12)
     v_last_year = str(int(v_busi_month[:4]) - 1)
     v_last_open_begin_date = v_last_year + '0101'
     v_last_open_end_date = v_last_year + '1231'
@@ -576,115 +577,115 @@ def p_cockpit_client_analyse_data(spark, busi_date):
                 when(
                     (col("a.total_done_amount").isNotNull()) & (col("a.total_done_amount") != 0),
                     col("a.DONE_AMOUNT_1") / col("a.total_done_amount")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("DONE_AMOUNT_1"),
         (
                 when(
                     (col("a.total_done_amount").isNotNull()) & (col("a.total_done_amount") != 0),
                     col("a.DONE_AMOUNT_3") / col("a.total_done_amount")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("DONE_AMOUNT_3"),
         (
                 when(
                     (col("a.total_done_amount").isNotNull()) & (col("a.total_done_amount") != 0),
                     col("a.DONE_AMOUNT_0") / col("a.total_done_amount")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("DONE_AMOUNT_0"),
         (
                 when(
                     (col("b.total_done_amount").isNotNull()) & (col("b.total_done_amount") != 0),
                     col("b.DONE_AMOUNT_1") / col("b.total_done_amount")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("last_DONE_AMOUNT_1"),
         (
                 when(
                     (col("b.total_done_amount").isNotNull()) & (col("b.total_done_amount") != 0),
                     col("b.DONE_AMOUNT_3") / col("b.total_done_amount")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("last_DONE_AMOUNT_3"),
         (
                 when(
                     (col("b.total_done_amount").isNotNull()) & (col("b.total_done_amount") != 0),
                     col("b.DONE_AMOUNT_0") / col("b.total_done_amount")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("last_DONE_AMOUNT_0"),
         (
                 when(
                     (col("a.total_done_money").isNotNull()) & (col("a.total_done_money") != 0),
                     col("a.done_money_1") / col("a.total_done_money")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("done_money_1"),
         (
                 when(
                     (col("a.total_done_money").isNotNull()) & (col("a.total_done_money") != 0),
                     col("a.done_money_3") / col("a.total_done_money")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("done_money_3"),
         (
                 when(
                     (col("a.total_done_money").isNotNull()) & (col("a.total_done_money") != 0),
                     col("a.done_money_0") / col("a.total_done_money")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("done_money_0"),
         (
                 when(
                     (col("b.total_done_money").isNotNull()) & (col("b.total_done_money") != 0),
                     col("b.done_money_1") / col("b.total_done_money")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("last_done_money_1"),
         (
                 when(
                     (col("b.total_done_money").isNotNull()) & (col("b.total_done_money") != 0),
                     col("b.done_money_3") / col("b.total_done_money")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("last_done_money_3"),
         (
                 when(
                     (col("b.total_done_money").isNotNull()) & (col("b.total_done_money") != 0),
                     col("b.done_money_0") / col("b.total_done_money")
-                ).otherwise(0) * 100
+                ).otherwise(0)
         ).alias("last_done_money_0")
     )
 
     df_y = tmp_result.alias("t") \
         .select(
         col("t.oa_branch_id"),
-        col("t.DONE_AMOUNT_1"),
+        (col("t.DONE_AMOUNT_1") * 100).alias("DONE_AMOUNT_1"),
         (
                 when(
                     (col("t.last_DONE_AMOUNT_1").isNotNull()) & (col("t.last_DONE_AMOUNT_1") != 0),
                     col("t.DONE_AMOUNT_1") / col("t.last_DONE_AMOUNT_1") - 1
                 ).otherwise(0) * 100
         ).alias("DONE_AMOUNT_1_yoy"),
-        col("t.DONE_AMOUNT_3"),
+        (col("t.DONE_AMOUNT_3") * 100).alias("DONE_AMOUNT_3"),
         (
                 when(
                     (col("t.last_DONE_AMOUNT_3").isNotNull()) & (col("t.last_DONE_AMOUNT_3") != 0),
                     col("t.DONE_AMOUNT_3") / col("t.last_DONE_AMOUNT_3") - 1
                 ).otherwise(0) * 100
         ).alias("DONE_AMOUNT_3_yoy"),
-        col("t.DONE_AMOUNT_0"),
+        (col("t.DONE_AMOUNT_0") * 100).alias("DONE_AMOUNT_0"),
         (
                 when(
                     (col("t.last_DONE_AMOUNT_0").isNotNull()) & (col("t.last_DONE_AMOUNT_0") != 0),
                     col("t.DONE_AMOUNT_0") / col("t.last_DONE_AMOUNT_0") - 1
                 ).otherwise(0) * 100
         ).alias("DONE_AMOUNT_0_yoy"),
-        col("t.done_money_1"),
+        (col("t.done_money_1") * 100).alias("done_money_1"),
         (
                 when(
                     (col("t.last_done_money_1").isNotNull()) & (col("t.last_done_money_1") != 0),
                     col("t.done_money_1") / col("t.last_done_money_1") - 1
                 ).otherwise(0) * 100
         ).alias("done_money_1_yoy"),
-        col("t.done_money_3"),
+        (col("t.done_money_3") * 100).alias("done_money_3"),
         (
                 when(
                     (col("t.last_done_money_3").isNotNull()) & (col("t.last_done_money_3") != 0),
                     col("t.done_money_3") / col("t.last_done_money_3") - 1
                 ).otherwise(0) * 100
         ).alias("done_money_3_yoy"),
-        col("t.done_money_0"),
+        (col("t.done_money_0") * 100).alias("done_money_0"),
         (
                 when(
                     (col("t.last_done_money_0").isNotNull()) & (col("t.last_done_money_0") != 0),
@@ -726,7 +727,346 @@ def p_cockpit_client_analyse_data(spark, busi_date):
     )
 
     # 经纪业务收入结构
-    # TODO: 暂时没有逻辑，不开发
+    # 经纪业务收入 = 留存手续费收入 + 利息收入 + 交易所减收
+    # 留存手续费收入 = 手续费 - 上交手续费(资金对账表)
+    # 利息收入 = 驾驶舱一期业务板块里的息差收入
+    # 交易所减收 = 内核表 - 投资者交易所返还计算 - 二次开发(业务报表 - 薪酬报表)
+    """
+      merge into CF_BUSIMG.T_COCKPIT_CLIENT_ANAL_RESPONS a
+  using (
+    with tmp as
+     (
+      --当月数据
+      select t.fund_account_id,
+              b.client_type,
+              d.RESPONS_LINE_ID,
+              sum(t.feature_income_total) as feature_income_total
+        from cf_busimg.t_cockpit_00174 t
+        left join cf_sett.t_fund_account b
+          on t.fund_account_id = b.fund_account_id
+       inner join cf_busimg.t_ctp_branch_oa_rela c
+          on b.branch_id = c.ctp_branch_id
+       inner join CF_BUSIMG.T_OA_BRANCH d
+          on c.oa_branch_id = d.departmentid
+       where t.busi_month = v_busi_month
+         and c.oa_branch_id is not null
+          and d.RESPONS_LINE_ID is not null
+       group by t.fund_account_id, b.client_type, d.RESPONS_LINE_ID),
+    tmp_last as
+     (
+      --同比月份数据
+      select t.fund_account_id,
+              b.client_type,
+              d.RESPONS_LINE_ID,
+              sum(t.feature_income_total) as feature_income_total
+        from cf_busimg.t_cockpit_00174 t
+        left join cf_sett.t_fund_account b
+          on t.fund_account_id = b.fund_account_id
+       inner join cf_busimg.t_ctp_branch_oa_rela c
+          on b.branch_id = c.ctp_branch_id
+       inner join CF_BUSIMG.T_OA_BRANCH d
+          on c.oa_branch_id = d.departmentid
+       where t.busi_month = v_last_busi_month
+         and c.oa_branch_id is not null
+         and d.RESPONS_LINE_ID is not null
+       group by t.fund_account_id, b.client_type, d.RESPONS_LINE_ID),
+    tmp_1 as
+     (
+      --当月各客户类型数据
+      select t.RESPONS_LINE_ID,
+              sum(t.feature_income_total) as total_qh_income,
+              sum(case
+                    when t.client_type = '0' then
+                     t.feature_income_total
+                    else
+                     0
+                  end) as qh_income_0,
+              sum(case
+                    when t.client_type = '1' then
+                     t.feature_income_total
+                    else
+                     0
+                  end) as qh_income_1,
+              sum(case
+                    when t.client_type in ('3', '4') then
+                     t.feature_income_total
+                    else
+                     0
+                  end) as qh_income_3
+        from tmp t
+       group by t.RESPONS_LINE_ID),
+    tmp_2 as
+     (
+      --同比月份
+      select t.RESPONS_LINE_ID,
+              sum(t.feature_income_total) as total_qh_income,
+              sum(case
+                    when t.client_type = '0' then
+                     t.feature_income_total
+                    else
+                     0
+                  end) as qh_income_0,
+              sum(case
+                    when t.client_type = '1' then
+                     t.feature_income_total
+                    else
+                     0
+                  end) as qh_income_1,
+              sum(case
+                    when t.client_type in ('3', '4') then
+                     t.feature_income_total
+                    else
+                     0
+                  end) as qh_income_3
+        from tmp_last t
+       group by t.RESPONS_LINE_ID),
+    tmp_result as
+     (select t.RESPONS_LINE_ID,
+             (case
+               when nvl(a.total_qh_income, 0) <> 0 then
+                nvl(a.qh_income_0, 0) / nvl(a.total_qh_income, 0)
+               else
+                0
+             end) as qh_income_0,
+             (case
+               when nvl(a.total_qh_income, 0) <> 0 then
+                nvl(a.qh_income_1, 0) / nvl(a.total_qh_income, 0)
+               else
+                0
+             end) as QH_INCOME_1,
+             (case
+               when nvl(a.total_qh_income, 0) <> 0 then
+                nvl(a.qh_income_3, 0) / nvl(a.total_qh_income, 0)
+               else
+                0
+             end) as QH_INCOME_3,
+             (case
+               when nvl(b.total_qh_income, 0) <> 0 then
+                nvl(b.qh_income_0, 0) / nvl(b.total_qh_income, 0)
+               else
+                0
+             end) as last_qh_income_0,
+             (case
+               when nvl(b.total_qh_income, 0) <> 0 then
+                nvl(b.qh_income_1, 0) / nvl(b.total_qh_income, 0)
+               else
+                0
+             end) as last_qh_income_1,
+             (case
+               when nvl(b.total_qh_income, 0) <> 0 then
+                nvl(b.qh_income_3, 0) / nvl(b.total_qh_income, 0)
+               else
+                0
+             end) as last_qh_income_3
+        from CF_BUSIMG.T_COCKPIT_CLIENT_ANAL_RESPONS t
+        left join tmp_1 a
+          on t.RESPONS_LINE_ID = a.RESPONS_LINE_ID
+        left join tmp_2 b
+          on t.RESPONS_LINE_ID = b.RESPONS_LINE_ID
+       where t.BUSI_MONTH = v_busi_month)
+    select t.RESPONS_LINE_ID,
+           t.QH_INCOME_1 * 100 as QH_INCOME_1,
+           (case
+             when nvl(t.last_QH_INCOME_1, 0) <> 0 then
+              t.QH_INCOME_1 / nvl(t.last_QH_INCOME_1, 0) - 1
+             else
+              0
+           end) * 100 as QH_INCOME_1_YOY,
+           t.QH_INCOME_3 * 100 as QH_INCOME_3,
+           (case
+             when nvl(t.last_QH_INCOME_3, 0) <> 0 then
+              t.QH_INCOME_3 / nvl(t.last_QH_INCOME_3, 0) - 1
+             else
+              0
+           end) * 100 as QH_INCOME_3_YOY,
+           t.QH_INCOME_0 * 100 as QH_INCOME_0,
+           (case
+             when nvl(t.last_QH_INCOME_0, 0) <> 0 then
+              t.QH_INCOME_0 / nvl(t.last_QH_INCOME_0, 0) - 1
+             else
+              0
+           end) * 100 as QH_INCOME_0_YOY
+    
+      from tmp_result t
+    
+    ) y
+        on (a.RESPONS_LINE_ID = y.RESPONS_LINE_ID and
+           a.busi_month = v_busi_month) when matched then
+      update
+         set a.QH_INCOME_1     = y.QH_INCOME_1,
+             a.QH_INCOME_1_YOY = y.QH_INCOME_1_YOY,
+             a.QH_INCOME_3     = y.QH_INCOME_3,
+             a.QH_INCOME_3_YOY = y.QH_INCOME_3_YOY,
+             a.QH_INCOME_0     = y.QH_INCOME_0,
+             a.QH_INCOME_0_YOY = y.QH_INCOME_0_YOY;
+  commit;
+    """
+
+    def get_tmp(tmp_month):
+        return spark.table("ddw.t_cockpit_00174").alias("t") \
+            .filter(
+            col("t.busi_month") == tmp_month
+        ).join(
+            other=spark.table("edw.h12_fund_account").alias("b"),
+            on=col("t.fund_account_id") == col("b.fund_account_id"),
+            how="left"
+        ).join(
+            other=spark.table("ddw.t_ctp_branch_oa_rela").alias("c"),
+            on=col("b.branch_id") == col("c.ctp_branch_id"),
+            how="inner"
+        ).filter(
+            col("c.oa_branch_id").isNotNull()
+        ).groupBy(
+            col("t.fund_account_id"),
+            col("b.client_type"),
+        ).agg(
+            sum("t.feature_income_total").alias("feature_income_total")
+        ).select(
+            col("t.fund_account_id"),
+            col("b.client_type"),
+            col("c.oa_branch_id"),
+            col("feature_income_total")
+        )
+
+    # 当月数据
+    tmp = get_tmp(v_busi_month)
+    # 同比月份数据
+    tmp_last = get_tmp(v_last_busi_month)
+
+    def get_tmp_1_and_2(data: DataFrame):
+        return data.alias("t") \
+            .groupBy(
+            col("t.oa_branch_id")
+        ).agg(
+            sum("t.feature_income_total").alias("total_qh_income"),
+            sum(
+                when(col("t.client_type") == "0", col("t.feature_income_total")).otherwise(0)
+            ).alias("qh_income_0"),
+            sum(
+                when(col("t.client_type") == "1", col("t.feature_income_total")).otherwise(0)
+            ).alias("qh_income_1"),
+            sum(
+                when(col("t.client_type").isin("3", "4"), col("t.feature_income_total")).otherwise(0)
+            ).alias("qh_income_3")
+        ).select(
+            col("t.oa_branch_id"),
+            col("total_qh_income"),
+            col("qh_income_0"),
+            col("qh_income_1"),
+            col("qh_income_3")
+        )
+    # 当月各客户类型数据
+    tmp_1 = get_tmp_1_and_2(tmp)
+    # 同比月份
+    tmp_2 = get_tmp_1_and_2(tmp_last)
+
+    tmp_result = df_m.alias("t") \
+        .join(
+        other=tmp_1.alias("a"),
+        on=col("t.oa_branch_id") == col("a.oa_branch_id"),
+        how="left"
+    ).join(
+        other=tmp_2.alias("b"),
+        on=col("t.oa_branch_id") == col("b.oa_branch_id"),
+        how="left"
+    ).select(
+        col("t.oa_branch_id"),
+        (
+                when(
+                    (col("a.total_qh_income").isNotNull()) & (col("a.total_qh_income") != 0),
+                    col("a.qh_income_0") / col("a.total_qh_income")
+                ).otherwise(0) * 100
+        ).alias("QH_INCOME_0"),
+        (
+                when(
+                    (col("a.total_qh_income").isNotNull()) & (col("a.total_qh_income") != 0),
+                    col("a.qh_income_1") / col("a.total_qh_income")
+                ).otherwise(0) * 100
+        ).alias("QH_INCOME_1"),
+        (
+                when(
+                    (col("a.total_qh_income").isNotNull()) & (col("a.total_qh_income") != 0),
+                    col("a.qh_income_3") / col("a.total_qh_income")
+                ).otherwise(0) * 100
+        ).alias("QH_INCOME_3"),
+        (
+                when(
+                    (col("b.total_qh_income").isNotNull()) & (col("b.total_qh_income") != 0),
+                    col("b.qh_income_0") / col("b.total_qh_income")
+                ).otherwise(0) * 100
+        ).alias("last_QH_INCOME_0"),
+        (
+                when(
+                    (col("b.total_qh_income").isNotNull()) & (col("b.total_qh_income") != 0),
+                    col("b.qh_income_1") / col("b.total_qh_income")
+                ).otherwise(0) * 100
+        ).alias("last_QH_INCOME_1"),
+        (
+                when(
+                    (col("b.total_qh_income").isNotNull()) & (col("b.total_qh_income") != 0),
+                    col("b.qh_income_3") / col("b.total_qh_income")
+                ).otherwise(0) * 100
+        ).alias("last_QH_INCOME_3")
+    )
+
+    df_y = tmp_result.alias("t") \
+        .select(
+        col("t.oa_branch_id"),
+        (col("t.QH_INCOME_1") * 100).alias("QH_INCOME_1"),
+        (
+                when(
+                    (col("t.last_QH_INCOME_1").isNotNull()) & (col("t.last_QH_INCOME_1") != 0),
+                    col("t.QH_INCOME_1") / col("t.last_QH_INCOME_1") - 1
+                ).otherwise(0) * 100
+        ).alias("QH_INCOME_1_YOY"),
+        (col("t.QH_INCOME_3") * 100).alias("QH_INCOME_3"),
+        (
+                when(
+                    (col("t.last_QH_INCOME_3").isNotNull()) & (col("t.last_QH_INCOME_3") != 0),
+                    col("t.QH_INCOME_3") / col("t.last_QH_INCOME_3") - 1
+                ).otherwise(0) * 100
+        ).alias("QH_INCOME_3_YOY"),
+        (col("t.QH_INCOME_0") * 100).alias("QH_INCOME_0"),
+        (
+                when(
+                    (col("t.last_QH_INCOME_0").isNotNull()) & (col("t.last_QH_INCOME_0") != 0),
+                    col("t.QH_INCOME_0") / col("t.last_QH_INCOME_0") - 1
+                ).otherwise(0) * 100
+        ).alias("QH_INCOME_0_YOY")
+    )
+
+    df_m = update_dataframe(
+        df_to_update=df_m,
+        df_use_me=df_y,
+        join_columns=["oa_branch_id"],
+        update_columns=[
+            "QH_INCOME_1",
+            "QH_INCOME_1_YOY",
+            "QH_INCOME_3",
+            "QH_INCOME_3_YOY",
+            "QH_INCOME_0",
+            "QH_INCOME_0_YOY"
+        ]
+    )
+
+    return_to_hive(
+        spark=spark,
+        target_table="ddw.T_COCKPIT_CLIENT_ANALYSE",
+        df_result=df_m,
+        insert_mode="overwrite",
+    )
+
+    df_m = spark.table("ddw.T_COCKPIT_CLIENT_ANALYSE").alias("t") \
+        .filter(
+        col("t.busi_month") == v_busi_month
+    )
+
+
+
+
+
+
+
 
     # 增量权益分析-当年新开客户权益(万元)
     logger.info(to_color_str("增量权益分析-当年新开客户权益(万元)", "blue"))
@@ -1118,10 +1458,9 @@ def p_cockpit_client_analyse_data(spark, busi_date):
     # 计算客户的净贡献
     logger.info(to_color_str("计算客户的净贡献", "blue"))
 
-    # TODO: 以下逻辑看花眼,自动生成没检查
     df_jgx = spark.table("ods.t_ds_adm_investor_value").alias("a") \
         .filter(
-        regexp_replace(col("a.date_dt"), "-", "").between(v_begin_date, v_end_date)
+        regexp_replace(col("a.date_dt"), "-", "").between(v_jgx_busi_date, v_end_date)
     ).join(
         other=spark.table("ods.t_ds_adm_brokerdata_detail").alias("a2"),
         on=(
