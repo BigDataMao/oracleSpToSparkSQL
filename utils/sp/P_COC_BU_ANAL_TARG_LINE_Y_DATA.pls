@@ -1,26 +1,25 @@
-# -*- coding: utf-8 -*-
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, col, when, sum
+create or replace procedure cf_busimg.P_COC_BU_ANAL_TARG_LINE_Y_DATA(I_MONTH_ID    in varchar2,
+                                                                     o_return_code out integer,
+                                                                     o_return_msg  out varchar2) is
+  --========================================================================================================================
+  --系统名称:生成驾驶舱数据
+  --模块名称:
+  --模块编号:
+  --模块描述： CF_BUSIMG.T_COCKPIT_BU_ANAL_TARG_LINE_Y  经营分析-业务条线-经营目标完成情况-按年落地
+  --开发人员:zhongying.zhang
+  --目前版本:
+  --创建时间:20230408
+  --版    权:
+  --修改历史:
 
-from config import Config
-from utils.StructTypes.ddw_t_business_line import schema as ddw_t_business_line_schema
-from utils.StructTypes.ddw_t_busi_anal_target_type import schema as ddw_t_busi_anal_target_type_schema
-from utils.StructTypes.ddw_t_cockpit_00138 import schema as ddw_t_cockpit_00138_schema
-from utils.StructTypes.ddw_t_oa_branch import schema as ddw_t_oa_branch_schema
-from utils.io_utils.common_uitls import to_color_str
-from utils.task_env import return_to_hive, update_dataframe, log
-
-logger = Config().get_logger()
-
-
-@log
-def p_coc_bu_anal_targ_line_y_data(spark, i_month_id):
-    """
-    经营分析-业务条线-经营目标完成情况-按年落地
-    """
-
-    """
-    v_busi_year := substr(I_MONTH_ID, 1, 4);
+  --========================================================================================================================
+  v_op_object  VARCHAR2(50) DEFAULT 'P_COC_BU_ANAL_TARG_LINE_Y_DATA'; -- '操作对象';
+  v_error_msg  VARCHAR2(200); --返回信息
+  v_error_code INTEGER;
+  v_userException EXCEPTION;
+  v_busi_year varchar2(4); --业务年份
+begin
+  v_busi_year := substr(I_MONTH_ID, 1, 4);
 
   delete from CF_BUSIMG.T_COCKPIT_BU_ANAL_TARG_LINE_Y t
    where t.busi_year = v_busi_year;
@@ -49,7 +48,7 @@ def p_coc_bu_anal_targ_line_y_data(spark, i_month_id):
      BUSI_TYPE_NAME
    )
     select v_busi_year as BUSI_YEAR, t.business_line_id,a.busi_type,a.busi_type_name
-      from CF_BUSIMG.T_business_line t 
+      from CF_BUSIMG.T_business_line t
       inner join CF_BUSIMG.T_BUSI_ANAL_TARGET_TYPE a
       on 1=1
      where t.if_use='1';
@@ -137,7 +136,7 @@ def p_coc_bu_anal_targ_line_y_data(spark, i_month_id):
               t.complete_value / t.year_target_value
              else
               0
-           end) as complete_value_rate
+           end)*100 as complete_value_rate--20240628
       from tmp t) y
         on (x.busi_year = v_busi_year and
            x.business_line_id = y.business_line_id and x.busi_type = y.busi_type) when
@@ -145,129 +144,36 @@ def p_coc_bu_anal_targ_line_y_data(spark, i_month_id):
       update
          set x.complete_value      = y.complete_value,
              x.complete_value_rate = y.complete_value_rate;
-    """
+  commit;
+  O_RETURN_CODE := 0;
+  O_RETURN_MSG  := '执行成功';
+EXCEPTION
+  when v_userException then
+    ROLLBACK;
+    v_error_msg  := o_return_msg;
+    v_error_code := o_return_code;
+    wolf.p_error_log('admin', -- '操作人';
+                     v_op_object, -- '操作对象';
+                     v_error_code, --'错误代码';
+                     v_error_msg, -- '错误信息';
+                     '',
+                     '',
+                     o_return_msg, --返回信息
+                     o_return_code --返回值 0 成功必须返回；-1 失败
+                     );
 
-    v_busi_year = i_month_id[:4]
-
-    logger.info(to_color_str('初始化数据', 'blue'))
-
-    df_business_line = spark.table("ddw.t_business_line").where("if_use='1'")
-    df_business_line = spark.createDataFrame(
-        data=df_business_line.rdd,
-        schema=ddw_t_business_line_schema
-    )
-
-    df_target_type = spark.table("ddw.t_busi_anal_target_type")
-    df_target_type = spark.createDataFrame(
-        data=df_target_type.rdd,
-        schema=ddw_t_busi_anal_target_type_schema
-    )
-
-    df_result_y = df_business_line.crossJoin(df_target_type).select(
-        lit(v_busi_year).alias("busi_year"),
-        df_business_line["business_line_id"],
-        df_target_type["busi_type"],
-        df_target_type["busi_type_name"]
-    )
-
-    return_to_hive(
-        spark=spark,
-        df_result=df_result_y,
-        target_table='ddw.t_cockpit_bu_anal_targ_line_y',
-        insert_mode='overwrite'
-    )
-
-    df_result_y = spark.table('ddw.t_cockpit_bu_anal_targ_line_y').where(col('busi_year') == lit(v_busi_year))
-
-    logger.info(to_color_str('更新各个指标的数据', 'blue'))
-
-    df_138_yq = spark.table('ddw.t_cockpit_00138').where(col('year_id') == lit(v_busi_year))
-    df_138_yq = spark.createDataFrame(
-        data=df_138_yq.rdd,
-        schema=ddw_t_cockpit_00138_schema
-    )
-
-    df_oa_branch = spark.table('ddw.t_oa_branch').where(col('business_line_id').isNotNull())
-    df_oa_branch = spark.createDataFrame(
-        data=df_oa_branch.rdd,
-        schema=ddw_t_oa_branch_schema
-    )
-
-    tmp = df_138_yq.join(
-        other=df_oa_branch,
-        on=(df_138_yq['oa_branch_id'] == df_oa_branch['departmentid']),
-        how='inner'
-    ).groupBy(
-        df_oa_branch['business_line_id'],
-        when(
-            (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '1'),
-            '001'
-        ).when(
-            (df_138_yq['index_type'] == '1') & (df_138_yq['index_asses_benchmark'] == '1'),
-            '002'
-        ).when(
-            (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '2'),
-            '003'
-        ).when(
-            (df_138_yq['index_type'] == '1') & (df_138_yq['index_asses_benchmark'] == '2'),
-            '004'
-        ).when(
-            (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '3'),
-            '005'
-        ).when(
-            (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '4'),
-            '006'
-        ).when(
-            (df_138_yq['index_type'] == '1') & (df_138_yq['index_asses_benchmark'] == '4'),
-            '007'
-        ).when(
-            (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '5'),
-            '008'
-        ).when(
-            (df_138_yq['index_type'] == '1') & (df_138_yq['index_asses_benchmark'] == '5'),
-            '009'
-        ).when(
-            (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '6') &
-            (df_138_yq['index_name'].like('%新增直接开发有效客户数量%')),
-            '010'
-        ).when(
-            (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '6') &
-            (df_138_yq['index_name'].like('%新增有效客户数量%')),
-            '011'
-        ).when(
-            (df_138_yq['index_type'] == '0') & (df_138_yq['index_asses_benchmark'] == '7'),
-            '012'
-        ).otherwise('').alias('busi_type'),
-    ).agg(
-        sum(df_138_yq['year_target_value']).alias('year_target_value'),
-        sum(df_138_yq['complet_value']).alias('complete_value')
-    ).select(
-        df_oa_branch['business_line_id'],
-        'busi_type',
-        'year_target_value',
-        'complete_value',
-    )
-
-    df_y = tmp.select(
-        tmp['business_line_id'],
-        tmp['busi_type'],
-        tmp['complete_value'],
-        when(
-            tmp['year_target_value'] != 0,
-            tmp['complete_value'] / tmp['year_target_value'] * 100
-        ).otherwise(0).alias('complete_value_rate')
-    )
-
-    df_result_y = update_dataframe(
-        df_to_update=df_result_y,
-        df_use_me=df_y,
-        join_columns=['business_line_id', 'busi_type'],
-        update_columns=['complete_value', 'complete_value_rate']
-    )
-
-    return_to_hive(
-        spark=spark,
-        df_result=df_result_y,
-        target_table='ddw.t_cockpit_bu_anal_targ_line_y',
-        insert_mode='overwrite'
-    )
+  WHEN OTHERS THEN
+    O_RETURN_CODE := SQLCODE;
+    O_RETURN_MSG  := O_RETURN_MSG || SQLERRM;
+    V_ERROR_CODE  := SQLCODE;
+    V_ERROR_MSG   := SQLERRM;
+    WOLF.P_ERROR_LOG('admin',
+                     V_OP_OBJECT,
+                     V_ERROR_CODE,
+                     V_ERROR_MSG,
+                     '',
+                     '',
+                     O_RETURN_MSG,
+                     O_RETURN_CODE);
+    COMMIT;
+END;
