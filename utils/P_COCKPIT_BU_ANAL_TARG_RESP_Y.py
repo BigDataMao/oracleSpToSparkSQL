@@ -97,7 +97,10 @@ def p_cockpit_bu_anal_targ_resp_y(spark, i_month_id):
             tmp['respons_line_id'],
             tmp['busi_type'],
             tmp['complete_value'],
-            when(tmp['year_target_value'] != 0, tmp['complete_value'] / tmp['year_target_value']).otherwise(0).alias('complete_value_rate')
+            when(
+                tmp['year_target_value'] != 0,
+                tmp['complete_value'] / tmp['year_target_value'] * 100
+            ).otherwise(0).alias('complete_value_rate')
         )
 
         y = update_dataframe(
