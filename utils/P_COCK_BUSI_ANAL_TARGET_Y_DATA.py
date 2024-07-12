@@ -94,7 +94,7 @@ def p_cock_busi_anal_target_y_data(spark, i_month_id):
             'complete_value',
             when(
                 tmp['year_target_value'] != 0,
-                tmp['complete_value'] / tmp['year_target_value']
+                tmp['complete_value'] / tmp['year_target_value'] * 100
             ).otherwise(0).alias('complete_value_rate')
         )
 
