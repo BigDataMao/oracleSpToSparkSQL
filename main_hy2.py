@@ -28,6 +28,7 @@ from utils.P_COCKPIT_ANAL_LINE_TOP_DATA import p_cockpit_anal_line_top_data
 from utils.P_COCKPIT_BUSI_ANALYSE_D_DATA import p_cockpit_busi_analyse_d_data
 from utils.P_COCKPIT_BUSI_ANALYSE_M_DATA import p_cockpit_busi_analyse_m_data
 from utils.P_COCKPIT_BUSI_ANAL_RESPONS_D import p_cockpit_busi_anal_respons_d
+from utils.P_COCKPIT_BUSI_ANAL_RESPONS_M import p_cockpit_busi_anal_respons_m
 from utils.P_COCKPIT_BUSI_ANAL_TAR_LINE_Q import p_cockpit_busi_anal_tar_line_q
 from utils.P_COCKPIT_BUSI_ANAL_TAR_RESP_Q import p_cockpit_busi_anal_tar_resp_q
 from utils.P_COCKPIT_BUSI_ANA_LINE_D_DATA import p_cockpit_busi_ana_line_d_data
@@ -125,7 +126,7 @@ if __name__ == '__main__':
     p_cockpit_busi_anal_respons_d(spark, busi_date)
     # 经营分析 - 分管部门 - 按月落地
     # 月数据
-    # p_cockpit_busi_anal_respons_m(spark, busi_date)
+    p_cockpit_busi_anal_respons_m(spark, busi_date)
     # 经营分析 - 分管部门 - 成交品种排名落地
     # 月数据
     p_cockpit_bu_anal_resp_top_pd(spark, busi_date)
