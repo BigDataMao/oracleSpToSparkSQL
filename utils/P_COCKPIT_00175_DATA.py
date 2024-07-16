@@ -9,10 +9,9 @@ from utils.task_env import log, return_to_hive
 
 
 @log
-def p_cockpit_00175_data(spark: SparkSession, list_pub_date, i_month_id):
+def p_cockpit_00175_data(spark: SparkSession, i_month_id):
     """
     IB协同收入调整表-按月落地
-    :param list_pub_date: 交易日列表
     :param spark: SparkSession对象
     :param i_month_id: 月份ID,格式为"YYYYMM"
     :return:
@@ -221,69 +220,7 @@ def p_cockpit_00175_data(spark: SparkSession, list_pub_date, i_month_id):
         sum("t.occur_money").alias("occur_money")
     )
 
-
     # 最终计算
-
-    """
-      INSERT INTO CF_BUSIMG.T_COCKPIT_00175
-    (MONTH_ID, BRANCH_ID, XT_INCOME)
-    with tmp as
-     (
-      select I_MONTH_ID,
-              V_CONFIRM_BEGIN_DATE || '-' || V_CONFIRM_END_DATE, --登记日期   
-              t.IB_BRANCH_ID, --证券营业部编号
-              t.FUND_ACCOUNT_ID, --资金账号
-              t.futu_service_name, --期货服务人员
-              t.branch_id, --期货营业部代码
-              sum(a.yes_rights), --期初权益
-              sum(a.end_rights), --期末权益,
-              sum(a.avg_rights), --日均权益,
-              sum(a.remain_transfee), --留存手续费
-              sum(a.remain_transfee * t.coope_income_reate) as coope_income, --IB协同收入
-              sum(nvl(b.interest_clear_income, 0)) as interest_clear_income, --利息收入
-              sum(nvl(c.market_reduct, 0) - nvl(d.occur_money, 0)) as market_reduct_income, --减免收入
-              t.COOPE_INCOME_REATE, --比例
-              sum(nvl(b.interest_clear_income, 0) * t.COOPE_INCOME_REATE) as xt_interest_clear_income, --协同利息收入=利息收入*比例
-              sum((nvl(c.market_reduct, 0) - nvl(d.occur_money, 0)) *
-                  t.COOPE_INCOME_REATE) as xt_market_reduct_income --协同减免收入=减免收入*比例
-        from CF_BUSIMG.T_COCKPIT_00107 t
-       inner join CF_BUSIMG.TMP_COCKPIT_00125_1 a
-          on t.fund_account_id = a.fund_account_id
-        left join CF_BUSIMG.TMP_COCKPIT_00125_4 b
-          on t.fund_account_id = b.fund_account_id
-        left join CF_BUSIMG.TMP_COCKPIT_00125_2 c
-          on t.fund_account_id = c.fund_account_id
-        left join CF_BUSIMG.TMP_COCKPIT_00125_3 d
-          on t.fund_account_id = d.fund_account_id
-       where t.service_type = '1' --服务类型(1:IB协同服务，2：IB驻点服务)
-       group by t.IB_BRANCH_ID,
-                 t.FUND_ACCOUNT_ID,
-                 t.futu_service_name,
-                 t.branch_id,
-                 t.COOPE_INCOME_REATE),
-    tmp1 as
-     (
-      --因为 期货服务人员会重复，所以要先去重
-      select t.FUND_ACCOUNT_ID,
-              t.coope_income, --IB协同收入
-              t.xt_interest_clear_income, --协同利息收入
-              t.xt_market_reduct_income --协同减免收入
-        from tmp t
-       group by t.FUND_ACCOUNT_ID,
-                 t.coope_income, --IB协同收入
-                 t.xt_interest_clear_income, --协同利息收入
-                 t.xt_market_reduct_income)
-    select I_MONTH_ID,
-           b.branch_id,
-           sum(t.coope_income + t.xt_interest_clear_income +
-               t.xt_market_reduct_income) as xt_income
-      from tmp1 t
-      left join cf_sett.t_fund_account b
-        on t.fund_account_id = b.fund_account_id
-     group by b.branch_id
-    ;
-  commit;
-    """
 
     tmp = spark.table("ddw.t_cockpit_00107").alias("t") \
         .join(
@@ -347,4 +284,3 @@ def p_cockpit_00175_data(spark: SparkSession, list_pub_date, i_month_id):
         target_table="ddw.T_COCKPIT_00175",
         insert_mode="overwrite",
     )
-
