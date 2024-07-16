@@ -144,7 +144,7 @@ def p_cockpit_00174_data(spark: SparkSession, list_pub_date, i_month_id):
         ("RET_FEE_AMT_czce", 4, lambda tx_dt: tx_dt <= end_date_minus_1_month),
         ("RET_FEE_AMT_dce", 4, lambda tx_dt: tx_dt <= end_date_minus_1_month),
         ("RET_FEE_AMT_shfe", 4, lambda tx_dt: tx_dt >= v_begin_date),
-        ("RET_FEE_AMT_shfe1", 4, lambda tx_dt: (tx_dt < to_date(lit('20220501'))) & (tx_dt <= end_date_minus_1_month)),
+        ("RET_FEE_AMT_shfe1", 4, lambda tx_dt: (tx_dt < lit('20220501')) & (tx_dt <= end_date_minus_1_month)),
         ("RET_FEE_AMT_cffex", 4, lambda tx_dt: tx_dt <= end_date_minus_1_month),
         ("RET_FEE_AMT_cffex2021", 4, lambda tx_dt: tx_dt <= end_date_minus_1_month),
         ("RET_FEE_AMT_dce31", 4, lambda tx_dt: tx_dt <= end_date_minus_1_month),
@@ -251,6 +251,3 @@ def p_cockpit_00174_data(spark: SparkSession, list_pub_date, i_month_id):
         target_table="ddw.t_cockpit_00174",
         insert_mode="overwrite"
     )
-
-
-
