@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 import json
-import sys
-from imp import reload
+from datetime import datetime
+
+from pyspark.sql.functions import col
 
 from config import Config
 from utils.P_BRP_06008_FGG_DATA_HY import p_brp_06008_fgg_data_hy
 from utils.P_BRP_06009_data_fgg_hy import p_brp_06009_data_fgg_hy
 from utils.P_BRP_06010_DATA import p_brp_06010_data
 from utils.P_BRP_06010_D_DATA import p_brp_06010_d_data
-from utils.date_utils import *
-from utils.io_utils.path_utils import get_project_path
+from utils.date_utils import get_date_period_and_days, get_trade_date
 from utils.parse_arguments import parse_arguments
 from utils.task_env import create_env
-
 
 if __name__ == '__main__':
     spark = create_env()
