@@ -1,28 +1,7 @@
 # -*- coding: utf-8 -*-
-import json
-import logging
-import os
-import sys
-from imp import reload
+from datetime import datetime
 
-from pyspark.sql.functions import udf, broadcast
-from pyspark.sql.types import BooleanType, StringType
-
-from utils.P_COCKPIT_00092_DATA import p_cockpit_00092_data
-from utils.P_COCKPIT_00093_DATA import p_cockpit_00093_data
-from utils.P_COCKPIT_00110_1_DATA import p_cockpit_00110_1_data
-from utils.P_COCKPIT_00110_BEFORE import p_cockpit_00110_before
-from utils.P_COCKPIT_00118_DATA import p_cockpit_00118_data
-from utils.P_COCKPIT_00119_DATA import p_cockpit_00119_data
-from utils.P_COCKPIT_00120_DATA import p_cockpit_00120_data
-from utils.P_COCKPIT_00121_DATA import p_cockpit_00121_data
-from utils.P_COCKPIT_00127_DATA import p_cockpit_00127_data
-from utils.P_COCKPIT_00128_DATA import p_cockpit_00128_data
-from utils.P_COCKPIT_00133_DATA import p_cockpit_00133_data
-from utils.P_COCKPIT_00135_DATA import p_cockpit_00135_data
-from utils.P_COCKPIT_00136_DATA import p_cockpit_00136_data
-from utils.P_COCKPIT_00137_DATA import p_cockpit_00137_data
-from utils.P_COCKPIT_00138_DATA import p_cockpit_00138_data
+from config import Config
 from utils.P_COCKPIT_ANALYSE_TOP_DATA import p_cockpit_analyse_top_data
 from utils.P_COCKPIT_ANAL_LINE_TOP_DATA import p_cockpit_anal_line_top_data
 from utils.P_COCKPIT_BUSI_ANALYSE_D_DATA import p_cockpit_busi_analyse_d_data
@@ -39,15 +18,13 @@ from utils.P_COCKPIT_BU_ANAL_TARG_RESP_Y import p_cockpit_bu_anal_targ_resp_y
 from utils.P_COCKPIT_CLIENT_ANALYSE_DATA import p_cockpit_client_analyse_data
 from utils.P_COCKPIT_CLIENT_LINE_DATA import p_cockpit_client_line_data
 from utils.P_COCKPIT_CLIENT_RESPONS_DATA import p_cockpit_client_respons_data
-from utils.P_COCKPIT_INDEX_MID_VALUE import p_cockpit_index_mid_value
 from utils.P_COCKPIT_RESPONS_TOP_DATA import p_cockpit_respons_top_data
 from utils.P_COCK_BUSI_ANAL_TARGET_Q_DATA import p_cock_busi_anal_target_q_data
 from utils.P_COCK_BUSI_ANAL_TARGET_Y_DATA import p_cock_busi_anal_target_y_data
 from utils.P_COC_BU_ANAL_TARG_LINE_Y_DATA import p_coc_bu_anal_targ_line_y_data
 from utils.P_INDEX_RESULT_DATA_BRANCH import p_index_result_data_branch
-from utils.task_env import *
-from utils.date_utils import *
 from utils.parse_arguments import parse_arguments
+from utils.task_env import create_env
 
 config = Config()
 logger = config.get_logger()
